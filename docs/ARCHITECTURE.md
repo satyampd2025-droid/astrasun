@@ -10,7 +10,11 @@ Rule: don't rebuild what a proven open-source system already does. Build only wh
 | 2 | **Our code lives in a custom Frappe app `astrasun`** | Upgrade-safe: we never edit ERPNext itself. |
 | 3 | **Floor-staff app: Flutter** | Runs well on cheap Android phones, works offline, one codebase. Talks to ERPNext over its REST API. |
 | 4 | **Hosting: cloud VPS (Mumbai region) with `frappe_docker`** | Reachable from anywhere; the mobile app covers internet outages at the mill. |
-| 5 | **WhatsApp: Meta WhatsApp Cloud API** | Alerts and the owner's evening summary. |
+| 5 | **WhatsApp: Meta WhatsApp Cloud API** (MVP) | Alerts, the owner's evening summary, and invoices/receipts to customers. |
+| 6 | **ERPNext is the accounting system** | One ledger for stock, sales and money; P&L and balance sheet come straight from it. No Tally books. |
+| 7 | **Hindi + English, voice input** (MVP) | Frappe translations for web; Flutter localisation and speech-to-text for the app. |
+
+Full decision log and PRD amendments: [DECISIONS.md](DECISIONS.md).
 
 ## What ERPNext gives us (don't build)
 - Customers, suppliers, items, price lists.
@@ -34,14 +38,15 @@ Rule: don't rebuild what a proven open-source system already does. Build only wh
 
 Gate → weighbridge → lab → unload flow inspired by [Gourav1195/millsaathi](https://github.com/Gourav1195/millsaathi).
 
-## Build order
-1. ERPNext + India Compliance running locally in Docker; mill master data (items, BOM, warehouses, roles).
-2. Gate Entry + Weighbridge Slip + mismatch alert.
-3. Sales order with credit approval → loading task → dispatch.
-4. Flutter app: login, role home screen, loading tasks, offline sync.
-5. WhatsApp alerts + evening summary.
-6. Owner dashboard and insights.
-7. Deploy to VPS; pilot alongside registers.
+## Build order (matches PRD delivery stages)
+1. **Foundation:** ERPNext + India Compliance in Docker; roles, audit ("reason" on critical changes), masters (items/SKUs, BOMs, warehouses: raw wheat, bulk atta, finished goods, packaging, by-products).
+2. **Inventory:** Gate Entry, Weighbridge Slip (weight gap), wheat lots with landed cost, QC with hold.
+3. **Manufacturing:** shift production batch (tempering water, weight balance, yield), packing batch, traceability.
+4. **Commercial:** sales order, minimum price engine, credit check, approval workflow (no self-approval).
+5. **Fulfilment:** loading queue, invoice + e-invoice + e-way bill, dispatch, payment collection.
+6. **Mobile + messaging:** Flutter app for each role (Hindi/English, voice), WhatsApp alerts and receipts.
+7. **Management:** owner dashboard, Six Sigma KPIs, stock statement, P&L, exports.
+8. **UAT & go-live:** deploy to VPS, backup/restore test, pilot alongside registers.
 
 ## Working model
 - Owner/founder decides priorities, how the mill works, and yes/no calls.

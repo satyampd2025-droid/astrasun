@@ -1,0 +1,487 @@
+<title>Atulyaa Mill Journeys</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Noto+Sans+Devanagari:wght@500;600&display=swap">
+<style>
+:root{
+  --bg:#F3F4F0; --surface:#FFFFFF; --screen:#FBFBF8; --ink:#1C211E; --muted:#5C655E; --line:#D8DCD4;
+  --accent:#1E5B45; --accent-ink:#FFFFFF; --accent-soft:#E2EEE8;
+  --ok:#2F7D4F; --ok-soft:#E3F1E8; --warn:#A8660E; --warn-soft:#FBEFD9; --bad:#B23A30; --bad-soft:#F8E3E0;
+  --t-tap:#1E5B45; --t-num:#A8660E; --t-search:#2A6F8F; --t-auto:#6A7069; --t-photo:#7A4E8A; --t-voice:#B23A30;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --hi:"Noto Sans Devanagari", "Nirmala UI", "Mangal", sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111512; --surface:#191F1B; --screen:#141915; --ink:#E5EAE5; --muted:#9AA39C; --line:#2B332E;
+    --accent:#5FB38F; --accent-ink:#0E1A14; --accent-soft:#1D3229;
+    --ok:#62BF86; --ok-soft:#1B3024; --warn:#DDA24A; --warn-soft:#3A2C14; --bad:#E57B70; --bad-soft:#3D1F1C;
+    --t-tap:#5FB38F; --t-num:#DDA24A; --t-search:#62A9C9; --t-auto:#9AA39C; --t-photo:#B98BC9; --t-voice:#E57B70;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111512; --surface:#191F1B; --screen:#141915; --ink:#E5EAE5; --muted:#9AA39C; --line:#2B332E;
+  --accent:#5FB38F; --accent-ink:#0E1A14; --accent-soft:#1D3229;
+  --ok:#62BF86; --ok-soft:#1B3024; --warn:#DDA24A; --warn-soft:#3A2C14; --bad:#E57B70; --bad-soft:#3D1F1C;
+  --t-tap:#5FB38F; --t-num:#DDA24A; --t-search:#62A9C9; --t-auto:#9AA39C; --t-photo:#B98BC9; --t-voice:#E57B70;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);padding-inline:20px;padding-block:0 64px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+header.top{padding-block:40px 24px;display:grid;gap:12px;max-width:760px}
+.eyebrow{font:600 12px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(30px,5vw,46px);font-weight:700;line-height:1.05}
+.lede{color:var(--muted);max-width:66ch;margin:0}
+.flow{font:500 13px/1.7 var(--mono);color:var(--muted);overflow-x:auto;white-space:nowrap;padding-bottom:4px}
+.flow b{color:var(--ink);font-weight:500}
+
+nav.jump{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:10px;display:flex;gap:6px;overflow-x:auto}
+nav.jump a{flex:none;font:500 13px/1 var(--body);color:var(--ink);text-decoration:none;padding:8px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+nav.jump a:hover,nav.jump a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+
+section.rules{margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:6px;align-content:start}
+.rule h3{font-size:17px;font-weight:600}
+.rule p{margin:0;color:var(--muted);font-size:14px}
+.legend{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
+.legend span.lbl{font-weight:600;color:var(--ink)}
+
+.t{display:inline-block;font:600 9.5px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;padding:3px 5px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+.t.tap{color:var(--t-tap)} .t.num{color:var(--t-num)} .t.search{color:var(--t-search)} .t.auto{color:var(--t-auto)} .t.photo{color:var(--t-photo)} .t.voice{color:var(--t-voice)}
+
+section.j{margin-top:56px;scroll-margin-top:70px}
+.jhead{display:grid;gap:6px;margin-bottom:16px}
+.jhead h2{font-size:clamp(24px,3.4vw,32px);font-weight:700}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:600}
+.phones{display:flex;gap:18px;overflow-x:auto;padding:4px 2px 14px}
+.step{flex:none;width:252px;display:grid;gap:8px;align-content:start}
+.cap{font-size:13px;color:var(--muted);min-height:2.6em}
+.cap b{color:var(--ink);font-weight:600}
+
+.phone{background:var(--screen);border:1px solid var(--line);border-radius:30px;padding:10px 12px 14px;box-shadow:0 1px 0 var(--line),0 10px 28px -18px rgba(0,0,0,.35);display:grid;gap:9px;align-content:start;min-height:470px;font-size:12.5px;line-height:1.35}
+.sb{display:flex;justify-content:space-between;font:500 10px/1 var(--mono);color:var(--muted);padding:2px 6px}
+.bar{display:flex;align-items:baseline;justify-content:space-between;gap:6px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.bar .hi{font:600 16px/1.2 var(--hi)}
+.bar .en{font-size:11px;color:var(--muted)}
+.f{display:grid;gap:3px}
+.fl{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.fv{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 9px;font-weight:500;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.fv.auto{background:transparent;border-style:dashed}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:var(--surface);font-size:12px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn{border-radius:12px;padding:12px;text-align:center;font-weight:600;font-size:14px;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.bad{background:var(--bad-soft);color:var(--bad)}
+.btn.warn{background:var(--warn-soft);color:var(--warn)}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.row3 .btn{padding:14px 4px;font-size:13px}
+.spacer{flex:1}
+.pill{display:inline-block;font:600 10.5px/1 var(--body);padding:4px 7px;border-radius:999px}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.n{background:var(--accent-soft);color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px;display:grid;gap:5px}
+.card .top{display:flex;justify-content:space-between;gap:6px;align-items:center;font-weight:600}
+.card .sub{color:var(--muted);font-size:11px}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dotted var(--line)}
+.kv:last-child{border-bottom:0}
+.kv span:first-child{color:var(--muted)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center;display:grid;gap:3px}
+.tile .big{font:700 20px/1 var(--display)}
+.tile.on{border:2px solid var(--accent);background:var(--accent-soft)}
+.tile .sub{font-size:10.5px;color:var(--muted)}
+.stepper{display:grid;grid-template-columns:42px 1fr 42px;gap:6px;align-items:center}
+.stepper div{border:1px solid var(--line);border-radius:10px;background:var(--surface);text-align:center;padding:9px 0;font-weight:600}
+.stepper .v{font:600 22px/1 var(--mono)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.pad div{background:var(--surface);border:1px solid var(--line);border-radius:8px;text-align:center;padding:7px 0;font:500 14px/1 var(--mono)}
+.note{font-size:11px;color:var(--muted)}
+.note.warn{color:var(--warn)} .note.ok{color:var(--ok)} .note.bad{color:var(--bad)}
+.banner{border-radius:10px;padding:9px;font-size:12px;display:grid;gap:3px}
+.banner.ok{background:var(--ok-soft);color:var(--ok)} .banner.warn{background:var(--warn-soft);color:var(--warn)} .banner.n{background:var(--accent-soft);color:var(--accent)}
+.banner b{font-weight:600}
+.notif{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;display:grid;gap:3px;box-shadow:0 6px 16px -12px rgba(0,0,0,.4)}
+.notif .app{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+.inputs{margin-top:10px;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td:nth-child(2){white-space:nowrap}
+.rulebox{margin-top:10px;font-size:14px;color:var(--muted);max-width:80ch}
+.rulebox b{color:var(--ink)}
+
+section.open{margin-top:64px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:10px}
+section.open h2{font-size:24px}
+section.open ul{margin:0;padding-left:18px;display:grid;gap:6px;color:var(--muted)}
+section.open li b{color:var(--ink)}
+@media (prefers-reduced-motion:no-preference){nav.jump a{transition:border-color .15s,color .15s}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">Atulyaa Mill OS · MVP journeys</span>
+  <h1>How each person uses the app, step by step</h1>
+  <p class="lede">Eight journeys follow one truck of wheat through to one customer's payment. Each screen shows how every input is captured. Most fields are filled by the system or picked with a tap; typing is kept for the few things only a person knows.</p>
+  <div class="flow"><b>Gate</b> → Weighbridge → <b>QC</b> → Raw wheat → <b>Production</b> → Bulk atta → <b>Packing</b> → Finished bags → <b>Sales order</b> → <b>Approval</b> → <b>Loading</b> → Invoice + e-way bill → Dispatch → <b>Payment</b></div>
+</header>
+
+<nav class="jump" aria-label="Journeys">
+  <a href="#rules">Input rules</a><a href="#gate">1 Gate &amp; weighbridge</a><a href="#qc">2 QC</a><a href="#prod">3 Production</a><a href="#pack">4 Packing</a><a href="#order">5 Sales order</a><a href="#approve">6 Approval</a><a href="#load">7 Loading &amp; dispatch</a><a href="#pay">8 Payment</a>
+</nav>
+
+<section id="rules" class="rules" style="scroll-margin-top:70px">
+  <div class="rule"><h3>Don't ask for what the system knows</h3><p>Vehicle number brings up the supplier and purchase order. Customer brings up price list, credit and payment terms. Lot IDs, batch IDs, totals and GST are generated.</p></div>
+  <div class="rule"><h3>Pick before type</h3><p>Anything with a short list of options (shift, SKU, QC decision, payment mode, reasons) is a chip or tile tap.</p></div>
+  <div class="rule"><h3>Numbers on a big numpad</h3><p>Weights, counts and rates open a numpad with the unit shown. Values outside the normal range turn amber and ask for a second tap to confirm.</p></div>
+  <div class="rule"><h3>Proof by photo, reasons by voice</h3><p>Weighbridge slips, supplier bills and cheques get a photo. Reasons and remarks can be spoken in Hindi and saved as text and audio.</p></div>
+  <div class="rule"><h3>One job per screen</h3><p>Each role opens on its own to-do list. One main button at the bottom, within thumb reach. Hindi and English on every screen.</p></div>
+  <div class="rule"><h3>Phone for the floor, web for the office</h3><p>These journeys are the phone app. Accounts, masters, reports and settings run on the web screens that come with ERPNext.</p></div>
+</section>
+<div class="legend"><span class="lbl">How each input is taken:</span>
+  <span><span class="t tap">Tap</span> chip, tile or button</span>
+  <span><span class="t num">Numpad</span> number entry</span>
+  <span><span class="t search">Search</span> type 2–3 letters, pick</span>
+  <span><span class="t auto">Auto</span> filled by the system</span>
+  <span><span class="t photo">Photo</span> camera</span>
+  <span><span class="t voice">Voice</span> speak Hindi or English</span>
+</div>
+
+<!-- 1 GATE -->
+<section class="j" id="gate">
+  <div class="jhead"><span class="eyebrow">Journey 1</span><h2>Wheat truck at the gate and weighbridge</h2>
+    <div class="meta"><span><b>Who:</b> gate / weighbridge operator</span><span><b>Starts when:</b> a truck arrives</span><span><b>Alerts:</b> purchase and lab (truck arrived), owner (weight gap over limit)</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Enter the vehicle number. The open purchase order and supplier fill in.</div>
+      <div class="phone"><div class="sb"><span>09:14</span><span>Gate</span></div>
+        <div class="bar"><span class="hi">गेट एंट्री</span><span class="en">Gate entry</span></div>
+        <div class="f"><div class="fl">Vehicle no. <span class="t search">Search</span></div><div class="fv num">RJ 14 GD 4821</div></div>
+        <div class="f"><div class="fl">Purpose <span class="t tap">Tap</span></div><div class="chips"><span class="chip on">Wheat in</span><span class="chip">Flour out</span><span class="chip">Other</span></div></div>
+        <div class="f"><div class="fl">Supplier · PO <span class="t auto">Auto</span></div><div class="fv auto">Shri Balaji Traders · PO-0231</div></div>
+        <div class="f"><div class="fl">Weight on supplier bill <span class="t num">Numpad</span></div><div class="fv"><span class="num">18,450</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Supplier bill <span class="t photo">Photo</span></div><div class="fv"><span>bill_4821.jpg</span><span class="pill ok">Added</span></div></div>
+        <div class="btn">Send to weighbridge</div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Enter the weight shown on the weighbridge, before and after unloading.</div>
+      <div class="phone"><div class="sb"><span>09:31</span><span>Weighbridge</span></div>
+        <div class="bar"><span class="hi">कांटा</span><span class="en">Weighbridge · RJ 14 GD 4821</span></div>
+        <div class="f"><div class="fl">Gross (loaded) <span class="t num">Numpad</span></div><div class="fv"><span class="num">31,280</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Tare (empty) <span class="t num">Numpad</span></div><div class="fv"><span class="num">12,910</span><span class="note">kg</span></div></div>
+        <div class="pad"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>⌫</div><div>0</div><div>OK</div></div>
+        <div class="f"><div class="fl">Weighbridge slip <span class="t photo">Photo</span></div><div class="fv"><span>slip_0931.jpg</span><span class="pill ok">Added</span></div></div>
+        <div class="note">Later: read directly from the weighbridge, no typing.</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> The system works out net weight and the gap, and creates the wheat lot.</div>
+      <div class="phone"><div class="sb"><span>10:02</span><span>Weighbridge</span></div>
+        <div class="bar"><span class="hi">लॉट बना</span><span class="en">Lot created</span></div>
+        <div class="card"><div class="top"><span class="num">WL-2609-014</span><span class="t auto">Auto</span></div>
+          <div class="kv"><span>Net received</span><span class="num">18,370 kg</span></div>
+          <div class="kv"><span>Supplier bill</span><span class="num">18,450 kg</span></div>
+          <div class="kv"><span>Gap</span><span class="num" style="color:var(--warn)">−80 kg (−0.43%)</span></div>
+          <div class="kv"><span>Landed cost</span><span class="num">₹27.35 / kg</span></div></div>
+        <div class="banner warn"><b>Gap is within 0.5% limit</b>Logged on the lot. Owner is alerted only above the limit.</div>
+        <div class="banner n"><b>Waiting for QC</b>Lab and purchase have been notified.</div>
+        <div class="btn ghost">Next truck</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Vehicle number</td><td><span class="t search">Search</span></td><td>Recent trucks appear after 2–3 characters; a new truck is typed once and remembered.</td></tr>
+    <tr><td>Supplier, PO, wheat variety, rate</td><td><span class="t auto">Auto</span></td><td>Taken from the purchase order linked to that vehicle. Purchase team creates the PO on the web beforehand.</td></tr>
+    <tr><td>Bill weight, gross, tare</td><td><span class="t num">Numpad</span> <span class="t photo">Photo</span></td><td>Typed with a photo of the slip as proof, so any gap can be checked later.</td></tr>
+    <tr><td>Net, gap, landed cost/kg, lot ID</td><td><span class="t auto">Auto</span></td><td>Calculated. Nobody can type over them.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 2 QC -->
+<section class="j" id="qc">
+  <div class="jhead"><span class="eyebrow">Journey 2</span><h2>Lab checks the wheat lot</h2>
+    <div class="meta"><span><b>Who:</b> QC / lab</span><span><b>Starts when:</b> a lot is waiting for QC</span><span><b>Result:</b> lot is accepted, held or rejected</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> The lab's home screen is the list of lots waiting, oldest first.</div>
+      <div class="phone"><div class="sb"><span>10:05</span><span>Lab</span></div>
+        <div class="bar"><span class="hi">जाँच बाकी</span><span class="en">Waiting for QC · 2</span></div>
+        <div class="card"><div class="top"><span class="num">WL-2609-014</span><span class="pill warn">3 min</span></div><div class="sub">Shri Balaji Traders · Sharbati · 18,370 kg</div></div>
+        <div class="card"><div class="top"><span class="num">WL-2609-013</span><span class="pill n">just now</span></div><div class="sub">Kisan Agro · Lokwan · 22,040 kg</div></div>
+        <div class="note">Tap a lot to test it.</div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Enter each reading. The normal range is shown and the colour updates as you type.</div>
+      <div class="phone"><div class="sb"><span>10:18</span><span>Lab</span></div>
+        <div class="bar"><span class="hi">जाँच</span><span class="en">WL-2609-014</span></div>
+        <div class="f"><div class="fl">Moisture % · normal 10–12.5 <span class="t num">Numpad</span></div><div class="fv"><span class="num">11.8</span><span class="pill ok">OK</span></div></div>
+        <div class="f"><div class="fl">Foreign matter % · max 1 <span class="t num">Numpad</span></div><div class="fv"><span class="num">0.6</span><span class="pill ok">OK</span></div></div>
+        <div class="f"><div class="fl">Broken grains % · max 2 <span class="t num">Numpad</span></div><div class="fv"><span class="num">1.9</span><span class="pill warn">Near limit</span></div></div>
+        <div class="f"><div class="fl">Damaged grains % · max 1 <span class="t num">Numpad</span></div><div class="fv"><span class="num">0.4</span><span class="pill ok">OK</span></div></div>
+        <div class="f"><div class="fl">Test weight kg/hl · min 76 <span class="t num">Numpad</span></div><div class="fv"><span class="num">78.2</span><span class="pill ok">OK</span></div></div>
+        <div class="f"><div class="fl">Sample photo <span class="t photo">Photo</span></div><div class="fv"><span class="note">Optional</span><span>+</span></div></div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> Choose the decision. Hold or reject needs a reason, which can be spoken.</div>
+      <div class="phone"><div class="sb"><span>10:20</span><span>Lab</span></div>
+        <div class="bar"><span class="hi">फ़ैसला</span><span class="en">Decision</span></div>
+        <div class="row3"><div class="btn">Accept</div><div class="btn warn">Hold</div><div class="btn bad">Reject</div></div>
+        <div class="f"><div class="fl">Reason (hold / reject) <span class="t tap">Tap</span> <span class="t voice">Voice</span></div><div class="chips"><span class="chip">High moisture</span><span class="chip">Insects</span><span class="chip">Smell</span><span class="chip">Other</span></div></div>
+        <div class="banner ok"><b>Accepted · 10:20</b>WL-2609-014 moved to the raw wheat store and can now be milled.</div>
+        <div class="note">The readings stay attached to the lot and to every batch milled from it.</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Lot</td><td><span class="t tap">Tap</span></td><td>Picked from the waiting list, never typed.</td></tr>
+    <tr><td>Quality readings</td><td><span class="t num">Numpad</span></td><td>Parameters and normal ranges are set once by management on the web and can change per wheat variety.</td></tr>
+    <tr><td>Accept / Hold / Reject</td><td><span class="t tap">Tap</span></td><td>Three large buttons. Only accepted lots appear in production.</td></tr>
+    <tr><td>Reason</td><td><span class="t tap">Tap</span> <span class="t voice">Voice</span></td><td>Common reasons as chips; anything else spoken.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 3 PRODUCTION -->
+<section class="j" id="prod">
+  <div class="jhead"><span class="eyebrow">Journey 3</span><h2>Milling batch for a shift</h2>
+    <div class="meta"><span><b>Who:</b> mill operator / production lead</span><span><b>Starts when:</b> start of shift</span><span><b>Alerts:</b> owner and manager if yield or loss is outside range</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Start the batch: pick the shift and the accepted wheat lots, enter how much wheat goes in.</div>
+      <div class="phone"><div class="sb"><span>06:02</span><span>Production</span></div>
+        <div class="bar"><span class="hi">बैच शुरू</span><span class="en">Start batch</span></div>
+        <div class="f"><div class="fl">Shift <span class="t tap">Tap</span></div><div class="chips"><span class="chip on">A · 6–2</span><span class="chip">B · 2–10</span><span class="chip">C · 10–6</span></div></div>
+        <div class="f"><div class="fl">Wheat lots (accepted only) <span class="t tap">Tap</span></div>
+          <div class="card"><div class="top"><span class="num">WL-2609-014</span><span class="pill ok">Selected</span></div><div class="sub">Sharbati · 18,370 kg left</div></div>
+          <div class="card"><div class="top"><span class="num">WL-2609-011</span><span class="pill n">Selected</span></div><div class="sub">Lokwan · 6,200 kg left</div></div></div>
+        <div class="f"><div class="fl">Wheat to mill <span class="t num">Numpad</span></div><div class="fv"><span class="num">20,000</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Batch · line · operator <span class="t auto">Auto</span></div><div class="fv auto"><span class="num">PR-2609-A1</span><span>Line 1 · Ramesh</span></div></div>
+        <div class="btn">Start batch</div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> At shift end, enter what came out and the water added during tempering.</div>
+      <div class="phone"><div class="sb"><span>13:48</span><span>Production</span></div>
+        <div class="bar"><span class="hi">बैच बंद</span><span class="en">Close batch · PR-2609-A1</span></div>
+        <div class="f"><div class="fl">Bulk atta <span class="t num">Numpad</span></div><div class="fv"><span class="num">14,900</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Suji <span class="t num">Numpad</span></div><div class="fv"><span class="num">1,000</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Bran / chokar <span class="t num">Numpad</span></div><div class="fv"><span class="num">4,200</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Tempering water added <span class="t num">Numpad</span></div><div class="fv"><span class="num">400</span><span class="note">litres</span></div></div>
+        <div class="f"><div class="fl">Downtime <span class="t tap">Tap</span> <span class="t num">Numpad</span></div><div class="chips"><span class="chip">None</span><span class="chip on">Power · 25 min</span><span class="chip">Breakdown</span></div></div>
+        <div class="btn">Check and close</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> The system checks that input and output balance and shows yield before saving.</div>
+      <div class="phone"><div class="sb"><span>13:49</span><span>Production</span></div>
+        <div class="bar"><span class="hi">बैच सारांश</span><span class="en">Batch summary</span></div>
+        <div class="card"><div class="top"><span>Weight balance</span><span class="t auto">Auto</span></div>
+          <div class="kv"><span>Wheat + water in</span><span class="num">20,400 kg</span></div>
+          <div class="kv"><span>Atta + suji + bran out</span><span class="num">20,100 kg</span></div>
+          <div class="kv"><span>Process loss</span><span class="num">300 kg · 1.5%</span></div></div>
+        <div class="card"><div class="top"><span>Atta yield</span><span class="pill ok">74.5% · normal</span></div><div class="sub">Normal range for Sharbati: 72–77%</div></div>
+        <div class="card"><div class="top"><span>Cost of atta</span><span class="num">₹30.10 / kg</span></div><div class="sub">Wheat, power, labour for this batch</div></div>
+        <div class="banner ok"><b>Saved</b>Raw wheat −20,000 kg · Bulk atta +14,900 kg · Suji +1,000 · Bran +4,200</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Shift, wheat lots</td><td><span class="t tap">Tap</span></td><td>Only QC-accepted lots with stock left are shown.</td></tr>
+    <tr><td>Wheat in, each output, water added</td><td><span class="t num">Numpad</span></td><td>Water is asked for so the weight balance doesn't show a false loss.</td></tr>
+    <tr><td>Downtime</td><td><span class="t tap">Tap</span> <span class="t num">Numpad</span></td><td>Reason chip, then minutes.</td></tr>
+    <tr><td>Balance, loss, yield, cost/kg, stock moves</td><td><span class="t auto">Auto</span></td><td>If the loss is above the limit, the operator must give a reason before saving, and the owner is alerted.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 4 PACKING -->
+<section class="j" id="pack">
+  <div class="jhead"><span class="eyebrow">Journey 4</span><h2>Packing bulk atta into bags</h2>
+    <div class="meta"><span><b>Who:</b> packing operator</span><span><b>Starts when:</b> packing run begins</span><span><b>Alerts:</b> store and purchase when empty bags fall below reorder level</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Tap the pack size being filled. Each tile shows empty bags in stock.</div>
+      <div class="phone"><div class="sb"><span>14:30</span><span>Packing</span></div>
+        <div class="bar"><span class="hi">पैकिंग</span><span class="en">Choose pack</span></div>
+        <div class="tiles">
+          <div class="tile"><span class="big">5 kg</span><span class="sub">2,300 empty bags</span></div>
+          <div class="tile on"><span class="big">10 kg</span><span class="sub">1,850 empty bags</span></div>
+          <div class="tile"><span class="big">26 kg</span><span class="sub">640 empty bags</span></div>
+          <div class="tile"><span class="big">50 kg</span><span class="sub" style="color:var(--warn)">90 · reorder</span></div></div>
+        <div class="f"><div class="fl">Bulk atta available <span class="t auto">Auto</span></div><div class="fv auto"><span class="num">14,900 kg</span><span>PR-2609-A1</span></div></div>
+        <div class="f"><div class="fl">Packing machine <span class="t tap">Tap</span></div><div class="chips"><span class="chip on">Packer 1</span><span class="chip">Packer 2</span></div></div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Count bags with +/− buttons or the numpad. Material used is worked out.</div>
+      <div class="phone"><div class="sb"><span>17:55</span><span>Packing</span></div>
+        <div class="bar"><span class="hi">बैग गिनती</span><span class="en">10 kg · count</span></div>
+        <div class="f"><div class="fl">Bags packed <span class="t num">Numpad</span> <span class="t tap">± 10</span></div>
+          <div class="stepper"><div>−10</div><div class="v">480</div><div>+10</div></div></div>
+        <div class="f"><div class="fl">Torn / rejected bags <span class="t num">Numpad</span></div><div class="fv"><span class="num">3</span><span class="note">bags</span></div></div>
+        <div class="f"><div class="fl">Bulk atta used <span class="t auto">Auto</span></div><div class="fv auto"><span class="num">4,800 kg</span><span class="note">480 × 10</span></div></div>
+        <div class="f"><div class="fl">Actual atta issued <span class="t num">Numpad</span></div><div class="fv"><span class="num">4,815</span><span class="note">kg</span></div></div>
+        <div class="f"><div class="fl">Packing loss <span class="t auto">Auto</span></div><div class="fv auto"><span class="num">15 kg · 0.31%</span><span class="pill ok">OK</span></div></div>
+        <div class="btn">Save packing</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> Finished stock goes up, bulk atta and empty bags go down.</div>
+      <div class="phone"><div class="sb"><span>17:56</span><span>Packing</span></div>
+        <div class="bar"><span class="hi">सेव हुआ</span><span class="en">Saved · PB-2609-031</span></div>
+        <div class="card"><div class="kv"><span>10 kg bags (ready)</span><span class="num">1,240 → 1,720</span></div>
+          <div class="kv"><span>Bulk atta</span><span class="num">14,900 → 10,085 kg</span></div>
+          <div class="kv"><span>Empty 10 kg bags</span><span class="num">1,850 → 1,367</span></div></div>
+        <div class="banner n"><b>Traceable</b>PB-2609-031 ← PR-2609-A1 ← lots WL-2609-014, WL-2609-011</div>
+        <div class="btn ghost">Pack another size</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Pack size, machine</td><td><span class="t tap">Tap</span></td><td>SKUs (5, 10, 26, 50 kg) are set once on the web.</td></tr>
+    <tr><td>Bags packed, torn bags, atta issued</td><td><span class="t num">Numpad</span> <span class="t tap">±</span></td><td>Large counter buttons; the packer can also key the final count.</td></tr>
+    <tr><td>Atta used, packing loss, stock changes, batch ID</td><td><span class="t auto">Auto</span></td><td>From the bag count and pack size. Later: scan a QR code printed on each bag.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 5 SALES ORDER -->
+<section class="j" id="order">
+  <div class="jhead"><span class="eyebrow">Journey 5</span><h2>Sales rep books an order</h2>
+    <div class="meta"><span><b>Who:</b> sales rep, at the shop or on a call</span><span><b>Target:</b> under 60 seconds</span><span><b>Checks:</b> stock, minimum price, credit</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Type a few letters of the customer. Their credit and dues show before anything else.</div>
+      <div class="phone"><div class="sb"><span>11:05</span><span>Sales</span></div>
+        <div class="bar"><span class="hi">नया ऑर्डर</span><span class="en">New order</span></div>
+        <div class="f"><div class="fl">Customer <span class="t search">Search</span></div><div class="fv">gupta<span class="note">|</span></div></div>
+        <div class="card"><div class="top"><span>Gupta Kirana Store</span><span class="pill ok">Good</span></div><div class="sub">Sanganer · credit left ₹1,85,000 · overdue ₹0</div></div>
+        <div class="card"><div class="top"><span>Gupta Traders</span><span class="pill bad">Overdue</span></div><div class="sub">Tonk Rd · ₹42,300 over 45 days</div></div>
+        <div class="note">Recent customers appear before you type.</div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Add quantities per pack. The rate fills from the price list, with the minimum price shown.</div>
+      <div class="phone"><div class="sb"><span>11:05</span><span>Sales</span></div>
+        <div class="bar"><span class="hi">माल</span><span class="en">Gupta Kirana · items</span></div>
+        <div class="card"><div class="top"><span>10 kg atta</span><span class="note">1,720 ready</span></div>
+          <div class="stepper"><div>−</div><div class="v">200</div><div>+</div></div>
+          <div class="fl">Rate / bag <span class="t auto">Auto</span> <span class="t num">edit</span></div><div class="fv"><span class="num">₹342</span><span class="pill ok">Above min ₹336</span></div></div>
+        <div class="card"><div class="top"><span>26 kg atta</span><span class="note">410 ready</span></div>
+          <div class="stepper"><div>−</div><div class="v">60</div><div>+</div></div>
+          <div class="fl">Rate / bag <span class="t auto">Auto</span> <span class="t num">edit</span></div><div class="fv"><span class="num">₹858</span><span class="pill warn">At min ₹858</span></div></div>
+        <div class="note">Below minimum turns red and the order needs special approval.</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> Pick a delivery day and submit. Checks run and the owner is notified.</div>
+      <div class="phone"><div class="sb"><span>11:06</span><span>Sales</span></div>
+        <div class="bar"><span class="hi">जाँचें और भेजें</span><span class="en">Review</span></div>
+        <div class="f"><div class="fl">Delivery <span class="t tap">Tap</span></div><div class="chips"><span class="chip on">Tomorrow</span><span class="chip">Day after</span><span class="chip">Pick date</span></div></div>
+        <div class="f"><div class="fl">Payment terms · deliver to <span class="t auto">Auto</span></div><div class="fv auto">15 days · shop address</div></div>
+        <div class="card"><div class="kv"><span>Items</span><span class="num">₹1,19,880</span></div><div class="kv"><span>GST (as per pack)</span><span class="num">₹3,420</span></div><div class="kv"><span><b>Total</b></span><span class="num"><b>₹1,23,300</b></span></div></div>
+        <div class="chips"><span class="pill ok">Stock ✓</span><span class="pill warn">Price at min</span><span class="pill ok">Credit ✓</span></div>
+        <div class="f"><div class="fl">Remarks <span class="t voice">Voice</span></div><div class="fv"><span class="note">"सुबह 10 बजे से पहले"</span><span class="note">Hold to speak</span></div></div>
+        <div class="btn">Submit for approval</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Customer</td><td><span class="t search">Search</span></td><td>Shows credit and overdue up front so the rep doesn't book an order that will be blocked.</td></tr>
+    <tr><td>Quantity per pack</td><td><span class="t tap">±</span> <span class="t num">Numpad</span></td><td>Steppers for small changes, numpad for big numbers. Ready stock shown beside each pack.</td></tr>
+    <tr><td>Rate</td><td><span class="t auto">Auto</span> <span class="t num">edit</span></td><td>From the price list. The rep can change it, but below-minimum needs special approval.</td></tr>
+    <tr><td>Delivery date</td><td><span class="t tap">Tap</span></td><td>Chips for the common choices.</td></tr>
+    <tr><td>Terms, address, GST, totals, order number</td><td><span class="t auto">Auto</span></td><td>From the customer record and SKU tax setup.</td></tr>
+    <tr><td>Remarks</td><td><span class="t voice">Voice</span></td><td>Optional.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 6 APPROVAL -->
+<section class="j" id="approve">
+  <div class="jhead"><span class="eyebrow">Journey 6</span><h2>Owner approves the order</h2>
+    <div class="meta"><span><b>Who:</b> owner / management</span><span><b>Starts when:</b> an order is submitted</span><span><b>Rule:</b> nobody can approve their own order</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> A notification arrives on the phone (and on WhatsApp, if chosen).</div>
+      <div class="phone"><div class="sb"><span>11:06</span><span></span></div>
+        <div class="notif"><span class="app">Atulyaa · now</span><b>Order needs approval</b><span>SO-0912 · Gupta Kirana · ₹1.23 L · 26 kg at minimum price</span></div>
+        <div class="notif"><span class="app">Atulyaa · 10:02</span><b>Wheat lot received</b><span>WL-2609-014 · 18,370 kg · gap −0.43%</span></div>
+        <div class="note">Tap the notification to open the order.</div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> One screen with everything needed to decide: margin, credit, stock, price.</div>
+      <div class="phone"><div class="sb"><span>11:07</span><span>Owner</span></div>
+        <div class="bar"><span class="hi">मंज़ूरी</span><span class="en">SO-0912 · by Suresh (sales)</span></div>
+        <div class="card"><div class="kv"><span>Revenue</span><span class="num">₹1,19,880</span></div>
+          <div class="kv"><span>Contribution</span><span class="num">₹9,480 · 7.9%</span></div>
+          <div class="kv"><span>Credit left after</span><span class="num">₹61,700</span></div>
+          <div class="kv"><span>Stock</span><span class="pill ok">Available</span></div></div>
+        <div class="card"><div class="kv"><span>10 kg · ₹342</span><span class="pill ok">+₹6 over min</span></div><div class="kv"><span>26 kg · ₹858</span><span class="pill warn">at min</span></div></div>
+        <div class="row3"><div class="btn">Approve</div><div class="btn warn">Send back</div><div class="btn bad">Reject</div></div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> Approve is one tap. Send back and reject need a reason. Everything goes in the history.</div>
+      <div class="phone"><div class="sb"><span>11:07</span><span>Owner</span></div>
+        <div class="bar"><span class="hi">मंज़ूर</span><span class="en">Approved</span></div>
+        <div class="banner ok"><b>Approved · 11:07 · by Owner</b>Sent to warehouse loading queue. Suresh notified.</div>
+        <div class="card"><div class="top"><span>History</span><span class="t auto">Auto</span></div>
+          <div class="kv"><span>11:06 Submitted</span><span>Suresh</span></div>
+          <div class="kv"><span>11:06 Checks</span><span>price at min</span></div>
+          <div class="kv"><span>11:07 Approved</span><span>Owner</span></div></div>
+        <div class="f"><div class="fl">If rejecting: reason <span class="t tap">Tap</span> <span class="t voice">Voice</span></div><div class="chips"><span class="chip">Price too low</span><span class="chip">Credit</span><span class="chip">Stock</span></div></div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Approve / Send back / Reject / Special approval</td><td><span class="t tap">Tap</span></td><td>Special approval appears only when price is below minimum or credit is exceeded, and only for roles allowed to override.</td></tr>
+    <tr><td>Reason</td><td><span class="t tap">Tap</span> <span class="t voice">Voice</span></td><td>Required for everything except a normal approval.</td></tr>
+    <tr><td>Margin, credit, stock, history</td><td><span class="t auto">Auto</span></td><td>Calculated when the order was submitted; the owner types nothing.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 7 LOADING -->
+<section class="j" id="load">
+  <div class="jhead"><span class="eyebrow">Journey 7</span><h2>Loading, invoice and dispatch</h2>
+    <div class="meta"><span><b>Who:</b> loading staff, then dispatch</span><span><b>Starts when:</b> an order is approved</span><span><b>Order:</b> loaded → invoice + e-way bill → truck leaves</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Warehouse home screen: approved orders, highest priority first.</div>
+      <div class="phone"><div class="sb"><span>12:10</span><span>Warehouse</span></div>
+        <div class="bar"><span class="hi">लोडिंग</span><span class="en">Loading queue · 3</span></div>
+        <div class="card"><div class="top"><span>Gupta Kirana</span><span class="pill bad">Urgent</span></div><div class="sub">SO-0912 · 200 × 10 kg, 60 × 26 kg · truck RJ 14 CB 2210</div><div class="btn">Start loading</div></div>
+        <div class="card"><div class="top"><span>Mahalaxmi Stores</span><span class="pill n">Today</span></div><div class="sub">SO-0909 · 120 × 50 kg</div></div>
+        <div class="card"><div class="top"><span>Jain Bros</span><span class="pill n">Tomorrow</span></div><div class="sub">SO-0910 · 300 × 5 kg</div></div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Count bags onto the truck. Any shortfall needs a reason.</div>
+      <div class="phone"><div class="sb"><span>12:34</span><span>Warehouse</span></div>
+        <div class="bar"><span class="hi">गिनती</span><span class="en">SO-0912 · loading</span></div>
+        <div class="card"><div class="top"><span>10 kg</span><span class="pill ok">200 / 200</span></div><div class="stepper"><div>−</div><div class="v">200</div><div>+</div></div></div>
+        <div class="card"><div class="top"><span>26 kg</span><span class="pill warn">58 / 60</span></div><div class="stepper"><div>−</div><div class="v">58</div><div>+</div></div></div>
+        <div class="f"><div class="fl">Why short? <span class="t tap">Tap</span></div><div class="chips"><span class="chip">Short stock</span><span class="chip on">Torn bags</span><span class="chip">Customer asked</span></div></div>
+        <div class="btn">Loading complete</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> Dispatch confirms truck details, generates the invoice and e-way bill, and releases the truck.</div>
+      <div class="phone"><div class="sb"><span>12:41</span><span>Dispatch</span></div>
+        <div class="bar"><span class="hi">रवाना</span><span class="en">Dispatch · SO-0912</span></div>
+        <div class="f"><div class="fl">Vehicle · transporter <span class="t auto">Auto</span></div><div class="fv auto">RJ 14 CB 2210 · Shyam Roadways</div></div>
+        <div class="f"><div class="fl">Driver <span class="t search">Search</span></div><div class="fv">Mohan · 98290 xxxxx</div></div>
+        <div class="f"><div class="fl">LR number <span class="t num">Numpad</span></div><div class="fv num">LR 55821</div></div>
+        <div class="card"><div class="kv"><span>Invoice</span><span class="num">INV-26-1188</span></div><div class="kv"><span>e-invoice IRN</span><span class="pill ok">Generated</span></div><div class="kv"><span>e-way bill</span><span class="pill ok">EWB 3711 0924 5518</span></div></div>
+        <div class="btn">Release truck</div>
+        <div class="note">Customer gets the invoice on WhatsApp. Stock and dues update.</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Order to load</td><td><span class="t tap">Tap</span></td><td>Only approved orders appear, so unapproved orders can't be loaded.</td></tr>
+    <tr><td>Bags loaded per pack</td><td><span class="t tap">±</span> <span class="t num">Numpad</span></td><td>Pre-set to the ordered quantity; the loader corrects if short.</td></tr>
+    <tr><td>Shortfall reason</td><td><span class="t tap">Tap</span></td><td>Required for any difference.</td></tr>
+    <tr><td>Vehicle, transporter</td><td><span class="t auto">Auto</span></td><td>From the gate entry when the empty truck came in.</td></tr>
+    <tr><td>Driver, LR number</td><td><span class="t search">Search</span> <span class="t num">Numpad</span></td><td>Regular drivers are remembered.</td></tr>
+    <tr><td>Invoice, IRN, e-way bill</td><td><span class="t auto">Auto</span></td><td>Made from the loaded quantities, never re-typed. They must exist before the truck leaves.</td></tr>
+  </tbody></table></div>
+</section>
+
+<!-- 8 PAYMENT -->
+<section class="j" id="pay">
+  <div class="jhead"><span class="eyebrow">Journey 8</span><h2>Payment received from a customer</h2>
+    <div class="meta"><span><b>Who:</b> accounts, sales rep or driver</span><span><b>Starts when:</b> money is collected</span><span><b>Rule:</b> cash taken on the road is confirmed by accounts</span></div></div>
+  <div class="phones">
+    <div class="step"><div class="cap"><b>1.</b> Find the customer. Open bills show, oldest first.</div>
+      <div class="phone"><div class="sb"><span>16:20</span><span>Collections</span></div>
+        <div class="bar"><span class="hi">वसूली</span><span class="en">Receive payment</span></div>
+        <div class="f"><div class="fl">Customer <span class="t search">Search</span></div><div class="fv">Gupta Kirana Store</div></div>
+        <div class="card"><div class="top"><span>Due now</span><span class="num">₹1,23,300</span></div>
+          <div class="kv"><span>INV-26-1188 · 0 days</span><span class="num">₹1,23,300</span></div></div>
+        <div class="card"><div class="top"><span>Credit left</span><span class="num">₹61,700</span></div></div></div></div>
+    <div class="step"><div class="cap"><b>2.</b> Enter the amount, tap how it was paid, add the reference or a photo.</div>
+      <div class="phone"><div class="sb"><span>16:21</span><span>Collections</span></div>
+        <div class="bar"><span class="hi">रकम</span><span class="en">Amount</span></div>
+        <div class="f"><div class="fl">Amount <span class="t num">Numpad</span></div><div class="fv"><span class="num">₹75,000</span></div></div>
+        <div class="f"><div class="fl">Mode <span class="t tap">Tap</span></div><div class="chips"><span class="chip">Cash</span><span class="chip on">UPI</span><span class="chip">Cheque</span><span class="chip">NEFT</span></div></div>
+        <div class="f"><div class="fl">UTR / cheque no. <span class="t num">Numpad</span></div><div class="fv num">4251 8870 2231</div></div>
+        <div class="f"><div class="fl">Screenshot / cheque <span class="t photo">Photo</span></div><div class="fv"><span>upi_1621.jpg</span><span class="pill ok">Added</span></div></div>
+        <div class="btn">Save payment</div></div></div>
+    <div class="step"><div class="cap"><b>3.</b> The payment is matched to the oldest bills and a receipt goes to the customer.</div>
+      <div class="phone"><div class="sb"><span>16:21</span><span>Collections</span></div>
+        <div class="bar"><span class="hi">रसीद</span><span class="en">Receipt · RC-26-0417</span></div>
+        <div class="card"><div class="top"><span>Matched</span><span class="t auto">Auto</span></div>
+          <div class="kv"><span>INV-26-1188</span><span class="num">₹75,000 of ₹1,23,300</span></div>
+          <div class="kv"><span>Still due</span><span class="num">₹48,300</span></div>
+          <div class="kv"><span>Credit left</span><span class="num">₹1,36,700</span></div></div>
+        <div class="banner n"><b>Receipt sent on WhatsApp</b>Accounts will see it in today's collections to check against the bank.</div></div></div>
+  </div>
+  <div class="inputs"><table><thead><tr><th>Field</th><th>How</th><th>Why this way</th></tr></thead><tbody>
+    <tr><td>Customer</td><td><span class="t search">Search</span></td><td>Shows what is due right away.</td></tr>
+    <tr><td>Amount, reference</td><td><span class="t num">Numpad</span></td><td>—</td></tr>
+    <tr><td>Mode</td><td><span class="t tap">Tap</span></td><td>Four chips.</td></tr>
+    <tr><td>Proof</td><td><span class="t photo">Photo</span></td><td>UPI screenshot or cheque photo.</td></tr>
+    <tr><td>Matching to bills, receipt, dues</td><td><span class="t auto">Auto</span></td><td>Oldest bill first; accounts can re-match on the web.</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="open">
+  <h2>Decisions and assumptions</h2>
+  <ul>
+    <li><b>Decided:</b> ERPNext is the accounting system (no separate Tally books).</li>
+    <li><b>Decided:</b> invoice and e-way bill are made before the truck leaves (journey 7).</li>
+    <li><b>Decided:</b> Hindi, voice input and WhatsApp alerts and receipts are in the MVP.</li>
+    <li><b>Still open:</b> offline use. The requirements document puts it after the MVP. If it moves into the MVP, gate, loading and packing screens would save on the phone and send when the network returns.</li>
+    <li><b>Weighbridge</b> weights are typed with a slip photo for the MVP; a direct connection comes later.</li>
+    <li><b>Payment collection</b> (journey 8) is added to the MVP scope; it's needed for dues to update.</li>
+    <li><b>Wheat purchase orders, masters, expenses, reports and settings</b> are done on the web and aren't shown here.</li>
+    <li>All names, quantities and rates on these screens are examples.</li>
+  </ul>
+</section>
+</div>
