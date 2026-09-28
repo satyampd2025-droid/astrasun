@@ -8,7 +8,7 @@ Rule: don't rebuild what a proven open-source system already does. Build only wh
 |---|---|---|
 | 1 | **Core: ERPNext (Frappe) + India Compliance app** | Accounts, credit limits, stock, manufacturing (wheat → aata/maida/sooji/chokar as by-products), GST, e-invoice and e-way bill come ready-made and free (GPL). |
 | 2 | **Our code lives in a custom Frappe app `astrasun`** | Upgrade-safe: we never edit ERPNext itself. |
-| 3 | **Floor-staff app: Flutter** | Runs well on cheap Android phones, works offline, one codebase. Talks to ERPNext over its REST API. |
+| 3 | **Floor-staff app: Flutter** | Runs well on cheap Android phones, can add offline use later (still open), one codebase. Talks to ERPNext over its REST API. |
 | 4 | **Hosting: cloud VPS (Mumbai region) with `frappe_docker`** | Reachable from anywhere; the mobile app covers internet outages at the mill. |
 | 5 | **WhatsApp: Meta WhatsApp Cloud API** (MVP) | Alerts, the owner's evening summary, and invoices/receipts to customers. |
 | 6 | **ERPNext is the accounting system** | One ledger for stock, sales and money; P&L and balance sheet come straight from it. No Tally books. |
