@@ -49,6 +49,21 @@ jobs:
       - name: Wait for the web server
         run: curl -fsS --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors http://localhost:8080/api/method/ping
 
+      - name: Where did the India Compliance bundle go?
+        continue-on-error: true
+        working-directory: docker
+        run: |
+          echo "===== A. the image as built"
+          docker run --rm -v "$PWD/../.github/diagnose/assets_check.sh:/tmp/check.sh:ro" --entrypoint bash astrasun:dev /tmp/check.sh
+          echo "===== B. the running backend container"
+          docker compose exec -T backend bash -s < ../.github/diagnose/assets_check.sh
+          echo "===== C. the running frontend (nginx) container"
+          docker compose exec -T frontend bash -s < ../.github/diagnose/assets_check.sh
+          echo "===== D. what the site hands to the browser (frappe.utils.get_assets_json)"
+          docker compose exec -T backend bench --site mill.localhost execute frappe.utils.get_assets_json | tr ',' '\n' | grep -iE 'india|astrasun|total' || echo "(no india/astrasun keys)"
+          echo "===== E. mounts of the backend container"
+          docker inspect docker-backend-1 --format '{{range .Mounts}}{{.Type}} {{.Destination}} {{.Name}}{{"\n"}}{{end}}'
+
       - name: Reproduce in a real browser
         timeout-minutes: 12
         working-directory: .github/diagnose
