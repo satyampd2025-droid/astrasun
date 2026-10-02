@@ -7,12 +7,12 @@ import '../widgets/voice_text_field.dart';
 
 String kg(double v) => '${v.round()} kg';
 
-void _failed(BuildContext context) {
+void _failed(BuildContext context, Object error) {
   final s = S.of(context);
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(
-        s.t('Could not save. Try again.'),
+        s.saveFailed(error),
         key: const Key('save-failed'),
       ),
     ),
@@ -62,8 +62,8 @@ class _GateEntryScreenState extends State<GateEntryScreen> {
         _slip.clear();
         _rate.clear();
       });
-    } on Exception {
-      if (mounted) _failed(context);
+    } on Exception catch (e) {
+      if (mounted) _failed(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -255,8 +255,8 @@ class _WeighbridgeState extends _TruckListState<WeighbridgeScreen> {
           ),
         );
       }
-    } on Exception {
-      if (mounted) _failed(context);
+    } on Exception catch (e) {
+      if (mounted) _failed(context, e);
     }
     reload();
   }
@@ -339,8 +339,8 @@ class _LabState extends _TruckListState<LabScreen> {
         decision: decision,
         remarks: remarks,
       );
-    } on Exception {
-      if (mounted) _failed(context);
+    } on Exception catch (e) {
+      if (mounted) _failed(context, e);
     }
     reload();
   }

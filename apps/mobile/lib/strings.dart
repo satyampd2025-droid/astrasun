@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'api/erpnext_client.dart' show ServerRefused;
+
 /// All app text in English and Hindi. Keys are English so a missing Hindi
 /// string still shows something readable.
 const Map<String, Map<String, String>> _strings = {
@@ -222,4 +224,9 @@ class S {
     }
     return text;
   }
+
+  /// What to tell the user when a save fails: the server's own reason when it
+  /// gave one, else the plain "try again".
+  String saveFailed(Object error) =>
+      error is ServerRefused ? error.reason : t('Could not save. Try again.');
 }

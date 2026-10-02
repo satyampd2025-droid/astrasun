@@ -54,9 +54,9 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
       messenger.showSnackBar(
         SnackBar(content: Text(s.t('Delivered to {0}', [name]))),
       );
-    } on Exception {
+    } on Exception catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text(s.t('Could not save. Try again.'))),
+        SnackBar(content: Text(s.saveFailed(e))),
       );
     }
     setState(() {

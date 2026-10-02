@@ -71,11 +71,11 @@ class _MillingScreenState extends State<MillingScreen> {
       for (final c in [_wheat, _water, _atta, _maida, _sooji, _chokar]) {
         c.clear();
       }
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }
@@ -188,11 +188,11 @@ class _DowntimeScreenState extends State<DowntimeScreen> {
       _machine.clear();
       _minutes.clear();
       _reason.clear();
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }
@@ -255,11 +255,11 @@ class _PackScreenState extends State<PackScreen> {
     try {
       await widget.client.pack(sku, int.tryParse(bags) ?? 0);
       if (mounted) _snack(context, s.t('Packed: {0} bags', [bags]));
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }

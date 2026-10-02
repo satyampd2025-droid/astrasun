@@ -99,11 +99,11 @@ class _DuesScreenState extends State<DuesScreen> {
           ),
         ),
       );
-    } on Exception {
+    } on Exception catch (e) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            s.t('Could not save. Try again.'),
+            s.saveFailed(e),
             key: const Key('save-failed'),
           ),
         ),

@@ -39,8 +39,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         _remarks.text.trim(),
       );
       setState(() => _sent = order);
-    } on Exception {
-      setState(() => _error = s.t('Could not save. Try again.'));
+    } on Exception catch (e) {
+      setState(() => _error = s.saveFailed(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
