@@ -31,6 +31,7 @@ class HomeScreen extends StatelessWidget {
     final roles = state.me!.millRoles;
     final tasks = tasksFor(roles);
     final client = state.client!;
+    final collect = mayCollect(roles);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 72,
@@ -79,17 +80,17 @@ class HomeScreen extends StatelessWidget {
               )
             else if (isOffice(roles)) ...[
               _SectionTitle(s.t('What to do now')),
-              _TileGrid(tasks: tasks, client: client),
+              _TileGrid(tasks: tasks, client: client, collect: collect),
             ] else ...[
               _SectionTitle(s.t('Next for you')),
-              _NextStepCard(task: tasks.first, client: client),
+              _NextStepCard(task: tasks.first, client: client, collect: collect),
               if (tasks.length > 1) ...[
                 const SizedBox(height: 24),
                 _SectionTitle(s.t('More work')),
                 for (final task in tasks.skip(1))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: _TaskRow(task: task, client: client),
+                    child: _TaskRow(task: task, client: client, collect: collect),
                   ),
               ],
             ],
@@ -100,11 +101,16 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-void _open(BuildContext context, Task task, ErpNextClient client) {
+void _open(
+  BuildContext context,
+  Task task,
+  ErpNextClient client,
+  bool collect,
+) {
   final s = S.of(context);
   Navigator.of(
     context,
-  ).push(MaterialPageRoute(builder: (_) => _screenFor(task, client, s)));
+  ).push(MaterialPageRoute(builder: (_) => _screenFor(task, client, s, collect)));
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -134,9 +140,14 @@ const _tints = [
 ];
 
 class _TileGrid extends StatelessWidget {
-  const _TileGrid({required this.tasks, required this.client});
+  const _TileGrid({
+    required this.tasks,
+    required this.client,
+    required this.collect,
+  });
   final List<Task> tasks;
   final ErpNextClient client;
+  final bool collect;
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +168,7 @@ class _TileGrid extends StatelessWidget {
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => _open(context, task, client),
+            onTap: () => _open(context, task, client, collect),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
@@ -195,9 +206,14 @@ class _TileGrid extends StatelessWidget {
 
 /// The one thing a floor worker should do next, big and green.
 class _NextStepCard extends StatelessWidget {
-  const _NextStepCard({required this.task, required this.client});
+  const _NextStepCard({
+    required this.task,
+    required this.client,
+    required this.collect,
+  });
   final Task task;
   final ErpNextClient client;
+  final bool collect;
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +224,7 @@ class _NextStepCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _open(context, task, client),
+        onTap: () => _open(context, task, client, collect),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -259,32 +275,41 @@ class _NextStepCard extends StatelessWidget {
 }
 
 /// The real screen for a task once it is built, else "coming soon".
-Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
-  'New order' => NewOrderScreen(client: client),
-  'My orders' => MyOrdersScreen(client: client),
-  'Approve orders' => ApprovalsScreen(client: client),
-  'Loading queue' => LoadingScreen(client: client),
-  'Bills and payments' => TrucksScreen(client: client, mode: TruckMode.invoice),
-  'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
-  'My deliveries' => DeliveriesScreen(client: client),
-  'Collect payment' || 'Customer dues' => DuesScreen(client: client),
-  'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),
-  'Weighbridge' => WeighbridgeScreen(client: client),
-  'Check wheat lot' => LabScreen(client: client),
-  'Start milling batch' => MillingScreen(client: client),
-  'Report downtime' => DowntimeScreen(client: client),
-  'Pack bags' => PackScreen(client: client),
-  'Stock' => StockScreen(client: client),
-  'Today at the mill' => DashboardScreen(client: client),
-  'Alerts' => AlertsScreen(client: client),
-  'Reports' => ReportsScreen(client: client),
-  _ => ComingSoonScreen(title: s.t(task.label)),
-};
+Widget _screenFor(Task task, ErpNextClient client, S s, bool collect) =>
+    switch (task.label) {
+      'New order' => NewOrderScreen(client: client),
+      'My orders' => MyOrdersScreen(client: client),
+      'Approve orders' => ApprovalsScreen(client: client),
+      'Loading queue' => LoadingScreen(client: client),
+      'Bills and payments' => TrucksScreen(client: client, mode: TruckMode.invoice),
+      'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
+      'My deliveries' => DeliveriesScreen(client: client),
+      'Collect payment' || 'Customer dues' => DuesScreen(
+        client: client,
+        canCollect: collect,
+      ),
+      'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),
+      'Weighbridge' => WeighbridgeScreen(client: client),
+      'Check wheat lot' => LabScreen(client: client),
+      'Start milling batch' => MillingScreen(client: client),
+      'Report downtime' => DowntimeScreen(client: client),
+      'Pack bags' => PackScreen(client: client),
+      'Stock' => StockScreen(client: client),
+      'Today at the mill' => DashboardScreen(client: client),
+      'Alerts' => AlertsScreen(client: client),
+      'Reports' => ReportsScreen(client: client),
+      _ => ComingSoonScreen(title: s.t(task.label)),
+    };
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task, required this.client});
+  const _TaskRow({
+    required this.task,
+    required this.client,
+    required this.collect,
+  });
   final Task task;
   final ErpNextClient client;
+  final bool collect;
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +333,7 @@ class _TaskRow extends StatelessWidget {
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => _open(context, task, client),
+        onTap: () => _open(context, task, client, collect),
       ),
     );
   }

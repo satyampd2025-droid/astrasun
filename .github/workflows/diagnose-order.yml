@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/diagnose-order.yml"
       - ".github/diagnose/order_rehearsal.py"
+      - ".github/diagnose/dues_check.py"
       - ".github/diagnose/stack.sh"
       - "docker/try-order.sh"
       - "docker/try_order.py"
@@ -123,6 +124,14 @@ jobs:
           grep -A1 "As ticked-only@example.com" try-order-5.txt | grep -q "OK. It would be saved"
           ! grep -q REFUSED try-order-5.txt
 
+      # Customer dues as the phone asks for them: a sales rep may look but not receive money.
+      - name: Customer dues over HTTP as a sales rep, the owner and a warehouse user
+        run: |
+          .github/diagnose/stack.sh in backend bash -c 'cd /home/frappe/frappe-bench/sites && ../env/bin/python -' \
+            < .github/diagnose/dues_check.py 2>&1 | tee dues-check.txt
+          ! grep -q FAIL dues-check.txt
+          grep -c "OK  " dues-check.txt | grep -q 4
+
       # The app's own tests for the same thing. Last, because ERPNext's test setup changes site defaults.
       - name: The app's role tests
         continue-on-error: true
@@ -137,6 +146,7 @@ jobs:
           path: |
             order-rehearsal.txt
             try-order-*.txt
+            dues-check.txt
             role-tests.txt
 
       - name: Container logs

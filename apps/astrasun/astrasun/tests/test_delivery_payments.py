@@ -50,6 +50,14 @@ class TestDeliveryAndPayments(MillFixture):
 		payments.collect(customer, due, "Bank", "UTR123456")
 		with self.assertRaises(payments.PaymentError):
 			payments.collect(customer, 1)
-		frappe.set_user(self.rep)
+		frappe.set_user(_user("loader@example.com", "Mill Warehouse"))
 		with self.assertRaises(frappe.PermissionError):
 			payments.dues()
+
+	def test_rep_sees_dues_but_cannot_collect(self):
+		"""PRD: a sales rep checks customer dues before taking an order; only collectors receive money."""
+		customer, _dn, _inv = self.make_dispatched()
+		frappe.set_user(self.rep)
+		self.assertIn(customer, [d["customer"] for d in payments.dues()])
+		with self.assertRaises(frappe.PermissionError):
+			payments.collect(customer, 1000)

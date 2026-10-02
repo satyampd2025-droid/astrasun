@@ -229,4 +229,10 @@ class S {
   /// gave one, else the plain "try again".
   String saveFailed(Object error) =>
       error is ServerRefused ? error.reason : t('Could not save. Try again.');
+
+  /// The same for a list that could not be loaded: the server's own reason
+  /// when it refused, else the plain "cannot reach the server".
+  String loadFailed(Object? error) => error is ServerRefused
+      ? error.reason
+      : t('Cannot reach the server. Check the internet.');
 }

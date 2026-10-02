@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 
 /// Sales rep: my orders and where each one stands.
@@ -21,11 +22,7 @@ class MyOrdersScreen extends StatelessWidget {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final orders = snap.data!;
           if (orders.isEmpty) {
             return Center(child: Text(s.t('No orders yet')));

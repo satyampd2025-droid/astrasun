@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'package:atulyaa_mill/api/demo_client.dart';
 import 'package:atulyaa_mill/api/erpnext_client.dart';
 import 'package:atulyaa_mill/api/models.dart';
+import 'package:atulyaa_mill/screens/dues_screen.dart';
 import 'package:atulyaa_mill/strings.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -23,6 +26,25 @@ Future<Object?> sendOrderAnswered(http.Response answer) async {
   } on Exception catch (e) {
     return e;
   }
+}
+
+/// A server that refuses to list customer dues, whatever the reason.
+class _RefusingClient extends DemoClient {
+  _RefusingClient(this.error) : super('Mill Sales');
+  final Object error;
+
+  @override
+  Future<List<Due>> dues() async => throw error;
+}
+
+Future<void> showDues(WidgetTester tester, Object error) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      locale: const Locale('en'),
+      home: DuesScreen(client: _RefusingClient(error), canCollect: false),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 String frappeMessages(String message) => jsonEncode([
@@ -93,5 +115,35 @@ void main() {
     expect(s.saveFailed(ServerRefused('Customer is disabled')), 'Customer is disabled');
     expect(s.saveFailed(ServerUnreachable()), 'Could not save. Try again.');
     expect(S('hi').saveFailed(ServerUnreachable()), 'सेव नहीं हुआ। दोबारा कोशिश करें।');
+  });
+
+  test('lists show the reason too, or the plain check-the-internet', () {
+    final s = S('en');
+    expect(s.loadFailed(ServerRefused('No access')), 'No access');
+    expect(
+      s.loadFailed(ServerUnreachable()),
+      'Cannot reach the server. Check the internet.',
+    );
+    expect(s.loadFailed(null), 'Cannot reach the server. Check the internet.');
+  });
+
+  testWidgets('a list the server refuses shows why, not "cannot reach"', (
+    tester,
+  ) async {
+    const reason = 'Only sales, drivers and accounts staff can see customer dues';
+    await showDues(tester, ServerRefused(reason));
+    expect(find.byKey(const Key('load-failed')), findsOneWidget);
+    expect(find.text(reason), findsOneWidget);
+    expect(find.textContaining('Cannot reach the server'), findsNothing);
+  });
+
+  testWidgets('a list that cannot be loaded at all says to check the internet', (
+    tester,
+  ) async {
+    await showDues(tester, ServerUnreachable());
+    expect(
+      find.text('Cannot reach the server. Check the internet.'),
+      findsOneWidget,
+    );
   });
 }

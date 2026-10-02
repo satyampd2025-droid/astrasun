@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 
 /// Who owes money. Driver and accounts receive payment here; it is matched
 /// to the customer's oldest bills first.
 class DuesScreen extends StatefulWidget {
-  const DuesScreen({super.key, required this.client});
+  const DuesScreen({super.key, required this.client, this.canCollect = true});
   final ErpNextClient client;
+
+  /// Drivers, accounts staff, managers and the owner receive money; anyone
+  /// else (a sales rep checking what a customer owes) only looks.
+  final bool canCollect;
 
   @override
   State<DuesScreen> createState() => _DuesScreenState();
@@ -125,11 +130,7 @@ class _DuesScreenState extends State<DuesScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final dues = snap.data!;
           if (dues.isEmpty) {
             return Center(
@@ -169,13 +170,15 @@ class _DuesScreenState extends State<DuesScreen> {
                             d.oldest ?? '-',
                           ]),
                         ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          key: Key('receive-${d.customer}'),
-                          icon: const Icon(Icons.payments_outlined),
-                          label: Text(s.t('Receive payment')),
-                          onPressed: () => _receive(d),
-                        ),
+                        if (widget.canCollect) ...[
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            key: Key('receive-${d.customer}'),
+                            icon: const Icon(Icons.payments_outlined),
+                            label: Text(s.t('Receive payment')),
+                            onPressed: () => _receive(d),
+                          ),
+                        ],
                       ],
                     ),
                   ),

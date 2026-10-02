@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/voice_text_field.dart';
 
 String kg(double v) => '${v.round()} kg';
@@ -168,11 +169,7 @@ abstract class _TruckListState<T extends StatefulWidget> extends State<T> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final list = snap.data!.where(wanted).toList();
           if (list.isEmpty) {
             return Center(

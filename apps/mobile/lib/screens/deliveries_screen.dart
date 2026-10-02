@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/voice_text_field.dart';
 
 /// Driver: trucks on the road. Confirm each one with the receiver's name.
@@ -75,11 +76,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final trucks = snap.data!;
           if (trucks.isEmpty) {
             return Center(
