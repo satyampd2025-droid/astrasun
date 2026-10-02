@@ -9,6 +9,12 @@ What it does today (Phase 1):
 - Voice input box (`lib/widgets/voice_text_field.dart`) for remarks and reasons, in Hindi or English.
 
 Screens behind the buttons arrive phase by phase; until then they open a "coming soon" page.
+**Try demo** on the login screen opens the app as any role with sample data and no server.
+
+## Preview APK
+Every push that touches `apps/mobile` builds an APK (`.github/workflows/android-preview.yml`) and puts it at
+https://github.com/satyampd2025-droid/astrasun/releases/download/app-preview/atulyaa-mill.apk
+Set the repository variable `MILL_SERVER_URL` once the mill server exists; until then the APK offers only the demo.
 
 ## Run
 ```bash

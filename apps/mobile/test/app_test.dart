@@ -144,4 +144,38 @@ void main() {
     await logIn(tester);
     expect(find.text('नया ऑर्डर'), findsOneWidget);
   });
+
+  testWidgets('demo works with no server', (tester) async {
+    await startApp(tester, const []);
+    await tester.tap(find.byKey(const Key('demo')));
+    await tester.pumpAndSettle();
+    expect(find.text('आप कौन हैं?'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('लोडिंग'), 200);
+    await tester.tap(find.text('लोडिंग'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('demo-banner')), findsOneWidget);
+    expect(find.text('लोडिंग सूची'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('logout')));
+    await tester.pumpAndSettle();
+    expect(find.text('लॉग इन करें'), findsOneWidget);
+  });
+
+  testWidgets('a real login shows no demo banner', (tester) async {
+    await startApp(tester, ['Mill Owner']);
+    await logIn(tester);
+    expect(find.byKey(const Key('demo-banner')), findsNothing);
+  });
+
+  testWidgets('staff build without a server offers only the demo', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final state = AppState(fixedServer: '', developerBuild: false);
+    await state.load();
+    await tester.pumpWidget(MillApp(state: state));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('no-server')), findsOneWidget);
+    expect(find.byKey(const Key('login')), findsNothing);
+    expect(find.byKey(const Key('demo')), findsOneWidget);
+  });
 }

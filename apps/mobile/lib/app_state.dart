@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api/demo_client.dart';
 import 'api/erpnext_client.dart';
 
 /// The mill's server, set when the app is built:
@@ -9,16 +11,25 @@ const builtInServer = String.fromEnvironment('SERVER_URL');
 
 /// Language, server and logged-in user, shared by every screen.
 class AppState extends ChangeNotifier {
-  AppState({this.clientFactory = _defaultClient, String? fixedServer})
-    : fixedServer = fixedServer ?? _fixedServer();
+  AppState({
+    this.clientFactory = _defaultClient,
+    String? fixedServer,
+    this.developerBuild = kDebugMode,
+  }) : fixedServer = fixedServer ?? _fixedServer();
 
   static ErpNextClient _defaultClient(String url) => ErpNextClient(url);
 
   final ErpNextClient Function(String url) clientFactory;
 
-  /// Server address staff never have to type. Empty only in developer builds.
+  /// Server address staff never have to type. Empty until the mill server exists.
   final String fixedServer;
-  bool get askForServer => fixedServer.isEmpty;
+  final bool developerBuild;
+
+  /// Only developers type a server address.
+  bool get askForServer => fixedServer.isEmpty && developerBuild;
+
+  /// A staff build with no server yet can only show the demo.
+  bool get canLogIn => fixedServer.isNotEmpty || askForServer;
 
   Locale locale = const Locale('hi');
   String serverUrl = '';
@@ -26,6 +37,7 @@ class AppState extends ChangeNotifier {
   Me? me;
 
   bool get loggedIn => me != null;
+  bool get isDemo => client is DemoClient;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -59,6 +71,13 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', server);
     await client!.setLanguage(locale.languageCode);
+    notifyListeners();
+  }
+
+  /// Try the app as any mill role, with sample data and no server.
+  Future<void> startDemo(String role) async {
+    client = DemoClient(role);
+    me = await client!.me();
     notifyListeners();
   }
 

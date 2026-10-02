@@ -20,7 +20,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "`in`.atulyaa.atulyaa_mill"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -30,11 +29,25 @@ android {
         versionName = flutter.versionName
     }
 
+    // Preview APKs built by CI are signed with one fixed key so each new build
+    // installs over the last one. The key is kept by CI, never in the repo.
+    val previewKeystore = file("preview.keystore")
+    signingConfigs {
+        if (previewKeystore.exists()) {
+            create("preview") {
+                storeFile = previewKeystore
+                storePassword = System.getenv("PREVIEW_KEYSTORE_PASSWORD")
+                keyAlias = "preview"
+                keyPassword = System.getenv("PREVIEW_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (previewKeystore.exists()) signingConfigs.getByName("preview")
+                else signingConfigs.getByName("debug")
         }
     }
 }

@@ -32,6 +32,17 @@ class HomeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (state.isDemo)
+              Container(
+                key: const Key('demo-banner'),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3D6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(s.t('Demo: sample data, nothing is saved')),
+              ),
             Text(
               s.t('What to do now'),
               style: Theme.of(context).textTheme.titleLarge,
