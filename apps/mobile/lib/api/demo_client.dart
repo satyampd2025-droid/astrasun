@@ -535,6 +535,32 @@ class DemoClient extends ErpNextClient {
   ];
 
   @override
+  Future<DayView> today() async => DayView(
+    salesBooked: 186500,
+    invoiced: 94800,
+    collected: 40000,
+    duesTotal: _dues.fold<double>(0, (a, d) => a + d.due),
+    ageing: const {'0-30': 52000, '31-60': 20000, '61+': 0},
+    pendingApprovals: _orders
+        .where((o) => o.status == 'Pending Approval')
+        .length,
+    trucksInYard: _wheat.where((t) => t.status != 'Received').length,
+    trucksToDispatch: _loading.where((t) => t.status == 'Loaded').length,
+    wheatGroundKg: 16000,
+    flourMadeKg: 13600,
+    extractionPct: 85,
+    downtimeMin: 45,
+    alerts: const [
+      MillAlert('weight', 'MP04AB9999 Ram Lal Mandi Traders: -300 kg (1.5%)'),
+      MillAlert('yield', 'Night shift: extraction 72.0%, loss 20 kg'),
+      MillAlert(
+        'credit',
+        'Verma Distributors: order of 112,000 is over the credit limit',
+      ),
+    ],
+  );
+
+  @override
   Future<Order> sendBack(String name, String reason) async =>
       _set(name, 'Sent Back', reason);
 

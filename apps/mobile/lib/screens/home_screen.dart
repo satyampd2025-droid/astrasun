@@ -7,6 +7,7 @@ import '../strings.dart';
 import '../widgets/language_switch.dart';
 import 'approvals_screen.dart';
 import 'coming_soon_screen.dart';
+import 'dashboard_screen.dart';
 import 'deliveries_screen.dart';
 import 'dues_screen.dart';
 import 'loading_screen.dart';
@@ -92,6 +93,8 @@ Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
   'Report downtime' => DowntimeScreen(client: client),
   'Pack bags' => PackScreen(client: client),
   'Stock' => StockScreen(client: client),
+  'Today at the mill' => DashboardScreen(client: client),
+  'Alerts' => AlertsScreen(client: client),
   _ => ComingSoonScreen(title: s.t(task.label)),
 };
 

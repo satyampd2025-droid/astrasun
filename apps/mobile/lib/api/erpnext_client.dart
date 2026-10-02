@@ -394,6 +394,11 @@ class ErpNextClient {
       StockRow.fromJson(j as Map<String, dynamic>),
   ];
 
+  Future<DayView> today() async => DayView.fromJson(
+    _message(await _post('astrasun.dashboard.today', {}))
+        as Map<String, dynamic>,
+  );
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }

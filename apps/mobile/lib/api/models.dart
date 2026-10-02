@@ -371,3 +371,67 @@ class StockRow {
   /// Raw, Bulk or Packed.
   final String kind;
 }
+
+/// One thing the owner should look at.
+class MillAlert {
+  const MillAlert(this.kind, this.text);
+
+  /// weight, yield, downtime or credit.
+  final String kind;
+  final String text;
+}
+
+/// The owner's picture of today.
+class DayView {
+  const DayView({
+    required this.salesBooked,
+    required this.invoiced,
+    required this.collected,
+    required this.duesTotal,
+    required this.ageing,
+    required this.pendingApprovals,
+    required this.trucksInYard,
+    required this.trucksToDispatch,
+    required this.wheatGroundKg,
+    required this.flourMadeKg,
+    required this.extractionPct,
+    required this.downtimeMin,
+    required this.alerts,
+  });
+
+  factory DayView.fromJson(Map<String, dynamic> j) => DayView(
+    salesBooked: (j['sales_booked'] as num).toDouble(),
+    invoiced: (j['invoiced'] as num).toDouble(),
+    collected: (j['collected'] as num).toDouble(),
+    duesTotal: (j['dues_total'] as num).toDouble(),
+    ageing: {
+      for (final e in (j['ageing'] as Map<String, dynamic>).entries)
+        e.key: (e.value as num).toDouble(),
+    },
+    pendingApprovals: j['pending_approvals'] as int,
+    trucksInYard: j['trucks_in_yard'] as int,
+    trucksToDispatch: j['trucks_to_dispatch'] as int,
+    wheatGroundKg: (j['wheat_ground_kg'] as num).toDouble(),
+    flourMadeKg: (j['flour_made_kg'] as num).toDouble(),
+    extractionPct: (j['extraction_pct'] as num).toDouble(),
+    downtimeMin: (j['downtime_min'] as num).toInt(),
+    alerts: [
+      for (final a in j['alerts'] as List)
+        MillAlert(a['kind'] as String, a['text'] as String),
+    ],
+  );
+
+  final double salesBooked;
+  final double invoiced;
+  final double collected;
+  final double duesTotal;
+  final Map<String, double> ageing;
+  final int pendingApprovals;
+  final int trucksInYard;
+  final int trucksToDispatch;
+  final double wheatGroundKg;
+  final double flourMadeKg;
+  final double extractionPct;
+  final int downtimeMin;
+  final List<MillAlert> alerts;
+}
