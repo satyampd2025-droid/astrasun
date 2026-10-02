@@ -1,7 +1,10 @@
-# Reproduces back-office problems on a throwaway copy of the server stack (same image as the
-# server: ERPNext v15 + India Compliance + astrasun) in a real browser. Nothing here touches
-# the live test server. Runs when this file or .github/diagnose/ changes on the test branch,
-# or by hand from the Actions tab.
+# Rehearses, on throwaway copies of the server stack (same image as the server: ERPNext v15 + India
+# Compliance + astrasun), why New Item failed in the back-office and whether the fix works. Nothing
+# here touches the live test server. Runs when the image files or .github/diagnose/ change on the
+# test branch, or by hand from the Actions tab.
+#   upgrade: old image on empty volumes -> browser check -> new image and `docker/deploy.sh` steps in
+#            place (the way the real server will be updated) -> browser check, with and without clear-cache
+#   fresh:   new image on empty volumes (the way a new environment starts) -> browser check
 name: Diagnose back-office
 
 on:
@@ -10,73 +13,114 @@ on:
     paths:
       - ".github/workflows/diagnose-back-office.yml"
       - ".github/diagnose/**"
+      - "docker/Dockerfile"
+      - "docker/compose*.yml"
+      - "docker/deploy.sh"
   workflow_dispatch:
 
 concurrency:
   group: diagnose-back-office
   cancel-in-progress: true
 
+env:
+  ADMIN_PASSWORD: ci-admin-pass-1
+
 jobs:
-  repro:
+  upgrade:
     runs-on: ubuntu-latest
     timeout-minutes: 50
-    env:
-      ADMIN_PASSWORD: ci-admin-pass-1
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build the server image
-        run: docker build -f docker/Dockerfile -t astrasun:dev .
+      - name: Build the OLD image (the Dockerfile the test server runs today)
+        run: docker build -f .github/diagnose/Dockerfile.old -t astrasun:dev .
 
-      - name: Start the stack and create the site
-        working-directory: docker
+      - name: Start the stack on empty volumes and finish the wizard
         run: |
-          printf 'SITE_NAME=mill.localhost\nADMIN_PASSWORD=%s\nDB_ROOT_PASSWORD=ci-root-pass-1\nHTTP_PORT=8080\n' "$ADMIN_PASSWORD" > .env
-          docker compose up -d
-          docker compose wait create-site || { docker compose logs --tail 80 create-site; exit 1; }
+          .github/diagnose/stack.sh up
+          .github/diagnose/stack.sh wizard
 
-      - name: Finish the setup wizard with the same answers as the real site
-        working-directory: docker
-        run: |
-          B="docker compose exec -T backend bench --site mill.localhost"
-          if ! $B execute frappe.desk.page.setup_wizard.setup_wizard.setup_complete \
-              --args '({"language":"English","country":"India","timezone":"Asia/Kolkata","currency":"INR","company_name":"Astrasun Global LLP","company_abbr":"AGL","chart_of_accounts":"India - Chart of Accounts","fy_start_date":"2026-04-01","fy_end_date":"2027-03-31"},)'; then
-            echo "::warning::wizard call failed, marking setup complete directly"
-            $B execute frappe.db.set_single_value --args '("System Settings","setup_complete",1)'
-          fi
-          $B execute frappe.db.sql --args '("select (select count(*) from tabCompany) companies, (select count(*) from tabItem) items",)'
-
-      - name: Wait for the web server
-        run: curl -fsS --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors http://localhost:8080/api/method/ping
-
-      - name: Where did the India Compliance bundle go?
-        continue-on-error: true
-        working-directory: docker
-        run: |
-          echo "===== A. the image as built"
-          docker run --rm -v "$PWD/../.github/diagnose/assets_check.sh:/tmp/check.sh:ro" --entrypoint bash astrasun:dev /tmp/check.sh
-          echo "===== B. the running backend container"
-          docker compose exec -T backend bash -s < ../.github/diagnose/assets_check.sh
-          echo "===== C. the running frontend (nginx) container"
-          docker compose exec -T frontend bash -s < ../.github/diagnose/assets_check.sh
-          echo "===== D. what the site hands to the browser (frappe.utils.get_assets_json)"
-          docker compose exec -T backend bench --site mill.localhost execute frappe.utils.get_assets_json | tr ',' '\n' | grep -iE 'india|astrasun|total' || echo "(no india/astrasun keys)"
-          echo "===== E. mounts of the backend container"
-          docker inspect docker-backend-1 --format '{{range .Mounts}}{{.Type}} {{.Destination}} {{.Name}}{{"\n"}}{{end}}'
-
-      - name: Reproduce in a real browser
-        timeout-minutes: 12
+      - name: Browser tools
         working-directory: .github/diagnose
         run: |
           npm init -y >/dev/null
           npm i playwright-core@1.49.1 >/dev/null
           mkdir -p out
-          node repro.js 2>&1 | tee out/log.txt
+
+      - name: "BEFORE: what the old image does (expected to fail)"
+        timeout-minutes: 12
+        working-directory: .github/diagnose
+        run: |
+          echo "===== script the page asks for"; ./serve_check.sh
+          PHASE=before SESSIONS=phone node repro.js 2>&1 | tee out/log-before.txt
+
+      - name: Build the NEW image (docker/Dockerfile with the fix)
+        run: docker build -f docker/Dockerfile -t astrasun:dev .
+
+      - name: Update the running stack the way docker/deploy.sh does
+        run: .github/diagnose/stack.sh upgrade
+
+      - name: "AFTER the update, before clearing the cache"
+        timeout-minutes: 12
+        working-directory: .github/diagnose
+        run: |
+          echo "===== what the running backend sees"; ./stack.sh in backend bash -s < assets_check.sh
+          echo "===== script the page asks for"; ./serve_check.sh
+          PHASE=after-update SESSIONS=phone node repro.js 2>&1 | tee out/log-after-update.txt
+
+      - name: AFTER clearing the cache
+        timeout-minutes: 12
+        working-directory: .github/diagnose
+        run: |
+          ./stack.sh in backend bench --site mill.localhost clear-cache
+          echo "===== script the page asks for"; ./serve_check.sh
+          PHASE=after-clear-cache SESSIONS=phone node repro.js 2>&1 | tee out/log-after-clear-cache.txt
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: diagnose-output
+          name: upgrade-output
+          path: .github/diagnose/out
+
+      - name: Container logs
+        if: failure()
+        working-directory: docker
+        run: docker compose logs --tail 60 backend create-site
+
+  fresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the NEW image
+        run: docker build -f docker/Dockerfile -t astrasun:dev .
+
+      - name: Start the stack on empty volumes and finish the wizard
+        run: |
+          .github/diagnose/stack.sh up
+          .github/diagnose/stack.sh wizard
+
+      - name: What the running containers see
+        working-directory: .github/diagnose
+        run: |
+          ./stack.sh in backend bash -s < assets_check.sh
+          echo "===== frontend (nginx)"; ./stack.sh in frontend bash -s < assets_check.sh
+          echo "===== script the page asks for"; ./serve_check.sh
+
+      - name: Browser check on phone and desktop
+        timeout-minutes: 15
+        working-directory: .github/diagnose
+        run: |
+          npm init -y >/dev/null
+          npm i playwright-core@1.49.1 >/dev/null
+          mkdir -p out
+          PHASE=fresh SESSIONS=phone,desktop node repro.js 2>&1 | tee out/log-fresh.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fresh-output
           path: .github/diagnose/out
 
       - name: Container logs
