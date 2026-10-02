@@ -29,7 +29,7 @@ class TestSetup(FrappeTestCase):
 
 	def test_mill_job_brings_its_standard_roles(self):
 		"""Ticking only the mill job is enough: the roles ERPNext checks for come with it."""
-		user = self._account("ticked-only@example.com", "Mill Sales")
+		user = self._account("job-only@example.com", "Mill Sales")
 		self.assertIn("Sales User", {r.role for r in user.roles})
 		self.assertTrue(frappe.has_permission("Sales Order", "create", user=user.name))
 
