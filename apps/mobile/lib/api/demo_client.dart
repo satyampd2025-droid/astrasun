@@ -210,6 +210,42 @@ class DemoClient extends ErpNextClient {
   Future<Order> reject(String name, String reason) async =>
       _set(name, 'Rejected', reason);
 
+  double _worth(List<OrderItem> items) => items.fold(0, (sum, i) {
+    final rate = _items.firstWhere((c) => c.code == i.itemCode).rate;
+    return sum + i.qty * rate;
+  });
+
+  @override
+  Future<List<LoadingTask>> trucksToInvoice() async => [
+    for (final t in _loading)
+      if (t.status == 'Loaded' && t.invoice == null) t,
+  ];
+
+  @override
+  Future<List<LoadingTask>> trucksToDispatch() async => [
+    for (final t in _loading)
+      if (t.status == 'Loaded' && t.invoice != null) t,
+  ];
+
+  @override
+  Future<LoadingTask> invoiceTruck(LoadingTask task, String ewayBillNo) async {
+    final total = _worth(task.items);
+    if (total > 50000 && ewayBillNo.trim().isEmpty) throw Exception('eway');
+    return _setTask(
+      task.id,
+      (t) => t.copyWith(
+        invoice: 'SINV-${task.id.substring(task.id.length - 4)}',
+        total: total,
+        ewayNeeded: total > 50000,
+        ewayBillNo: ewayBillNo.trim(),
+      ),
+    );
+  }
+
+  @override
+  Future<LoadingTask> dispatchTruck(LoadingTask task) async =>
+      _setTask(task.id, (t) => t.copyWith(status: 'Dispatched'));
+
   @override
   Future<Order> sendBack(String name, String reason) async =>
       _set(name, 'Sent Back', reason);

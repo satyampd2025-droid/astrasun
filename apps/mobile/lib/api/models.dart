@@ -116,6 +116,10 @@ class LoadingTask {
     required this.status,
     required this.items,
     this.vehicleNo,
+    this.invoice,
+    this.total = 0,
+    this.ewayNeeded = false,
+    this.ewayBillNo,
   });
 
   factory LoadingTask.fromJson(Map<String, dynamic> json) => LoadingTask(
@@ -124,6 +128,10 @@ class LoadingTask {
     customerName: (json['customer_name'] ?? json['customer']) as String,
     status: json['status'] as String,
     vehicleNo: json['vehicle_no'] as String?,
+    invoice: json['invoice'] as String?,
+    total: ((json['total'] as num?) ?? 0).toDouble(),
+    ewayNeeded: (json['eway_bill_needed'] as bool?) ?? false,
+    ewayBillNo: json['eway_bill_no'] as String?,
     items: [
       for (final i in json['items'] as List)
         OrderItem(
@@ -145,11 +153,23 @@ class LoadingTask {
   final String? vehicleNo;
   final List<OrderItem> items;
 
+  /// Set once the truck is billed (invoice before dispatch).
+  final String? invoice;
+  final double total;
+
+  /// Goods over Rs 50,000 need an e-way bill number.
+  final bool ewayNeeded;
+  final String? ewayBillNo;
+
   LoadingTask copyWith({
     String? id,
     String? status,
     String? vehicleNo,
     List<OrderItem>? items,
+    String? invoice,
+    double? total,
+    bool? ewayNeeded,
+    String? ewayBillNo,
   }) => LoadingTask(
     id: id ?? this.id,
     salesOrder: salesOrder,
@@ -157,5 +177,9 @@ class LoadingTask {
     status: status ?? this.status,
     vehicleNo: vehicleNo ?? this.vehicleNo,
     items: items ?? this.items,
+    invoice: invoice ?? this.invoice,
+    total: total ?? this.total,
+    ewayNeeded: ewayNeeded ?? this.ewayNeeded,
+    ewayBillNo: ewayBillNo ?? this.ewayBillNo,
   );
 }

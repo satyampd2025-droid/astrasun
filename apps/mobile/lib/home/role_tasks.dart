@@ -48,7 +48,7 @@ const Map<String, List<Task>> roleTasks = {
     Task('Stock', Icons.inventory_2_outlined, 2),
   ],
   'Mill Warehouse': [Task('Loading queue', Icons.forklift, 2)],
-  'Mill Dispatch': [Task('Assign trucks', Icons.alt_route, 2)],
+  'Mill Dispatch': [Task('Send trucks', Icons.local_shipping_outlined, 2)],
   'Mill Driver': [
     Task('My deliveries', Icons.delivery_dining_outlined, 2),
     Task('Collect payment', Icons.payments_outlined, 2),

@@ -14,7 +14,7 @@ FIELDS = {
 			"fieldname": "astrasun_loading_status",
 			"label": "Loading Status",
 			"fieldtype": "Select",
-			"options": "Loading\nLoaded",
+			"options": "Loading\nLoaded\nDispatched",
 			"default": "Loading",
 			"in_list_view": 1,
 			"in_standard_filter": 1,
@@ -32,6 +32,24 @@ FIELDS = {
 			"insert_after": "astrasun_loading_status",
 		},
 		{
+			"fieldname": "astrasun_invoice",
+			"label": "Invoice",
+			"fieldtype": "Link",
+			"options": "Sales Invoice",
+			"read_only": 1,
+			"no_copy": 1,
+			"allow_on_submit": 1,
+			"insert_after": "astrasun_vehicle_no",
+		},
+		{
+			"fieldname": "astrasun_eway_bill_no",
+			"label": "E-way Bill Number",
+			"fieldtype": "Data",
+			"no_copy": 1,
+			"allow_on_submit": 1,
+			"insert_after": "astrasun_invoice",
+		},
+		{
 			"fieldname": "astrasun_loaded_by",
 			"label": "Loaded By",
 			"fieldtype": "Link",
@@ -39,7 +57,7 @@ FIELDS = {
 			"read_only": 1,
 			"no_copy": 1,
 			"allow_on_submit": 1,
-			"insert_after": "astrasun_vehicle_no",
+			"insert_after": "astrasun_eway_bill_no",
 		},
 	]
 }
