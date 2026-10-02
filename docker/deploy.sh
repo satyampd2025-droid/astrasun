@@ -21,3 +21,4 @@ $C exec -T backend bench --site "$SITE" migrate
 $C exec -T backend grep -q india_compliance.bundle.js sites/assets/assets.json \
   || { echo "ERROR: the India Compliance web script is missing from sites/assets/assets.json" >&2; exit 1; }
 docker image prune -f >/dev/null
+echo "Update finished: the site is migrated and the India Compliance web script is in place."
