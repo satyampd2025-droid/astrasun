@@ -136,7 +136,19 @@ Resources:
         collation_server: utf8mb4_unicode_ci
         innodb_read_only_compressed: "0"
 
-  # Managed MariaDB. The master password is generated and kept by RDS in Secrets Manager.
+  # Database master login. Letters and digits only: RDS-generated passwords contain shell
+  # characters (; | $ >) that broke `bench new-site` and leaked parts of the password into logs.
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "astrasun/${EnvName}/db-master"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  # Managed MariaDB (RDS)
   Database:
     Type: AWS::RDS::DBInstance
     DeletionPolicy: Snapshot
@@ -151,8 +163,9 @@ Resources:
       StorageType: gp3
       StorageEncrypted: true
       MultiAZ: false
-      MasterUsername: admin
-      ManageMasterUserPassword: true
+      MasterUsername: admin  # must match the username in DbSecret
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
+      ManageMasterUserPassword: false
       DBSubnetGroupName: !Ref DbSubnetGroup
       DBParameterGroupName: !Ref DbParameterGroup
       VPCSecurityGroups: [!GetAtt DbFirewall.GroupId]
@@ -214,14 +227,14 @@ Resources:
                 Action: secretsmanager:GetSecretValue
                 Resource: !If
                   - UseToken
-                  - [!Ref AdminSecret, !GetAtt Database.MasterUserSecret.SecretArn, !Ref GitHubTokenSecretArn]
-                  - [!Ref AdminSecret, !GetAtt Database.MasterUserSecret.SecretArn]
+                  - [!Ref AdminSecret, !Ref DbSecret, !Ref GitHubTokenSecretArn]
+                  - [!Ref AdminSecret, !Ref DbSecret]
 
   ServerProfile:
     Type: AWS::IAM::InstanceProfile
     Properties: { Roles: [!Ref ServerRole] }
 
-  Server:
+  AppServer:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
@@ -282,7 +295,7 @@ Resources:
             chmod +x /usr/local/bin/astrasun-backup
             echo "0 2 * * * root /usr/local/bin/astrasun-backup >> /var/log/astrasun-backup.log 2>&1" > /etc/cron.d/astrasun-backup
             bash docker/deploy.sh
-          - DbSecretArn: !GetAtt Database.MasterUserSecret.SecretArn
+          - DbSecretArn: !Ref DbSecret
             TokenLine: !If
               - UseToken
               - !Sub "URL=https://x-access-token:$(aws secretsmanager get-secret-value --region $REGION --secret-id ${GitHubTokenSecretArn} --query SecretString --output text)@github.com/satyampd2025-droid/astrasun.git"
@@ -292,7 +305,7 @@ Resources:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
-      InstanceId: !Ref Server
+      InstanceId: !Ref AppServer
 
 Outputs:
   ServerAddress:
@@ -308,4 +321,4 @@ Outputs:
     Value: !Ref AdminSecret
   Login:
     Description: "Log in without SSH: AWS console, Systems Manager, Session Manager"
-    Value: !Ref Server
+    Value: !Ref AppServer
