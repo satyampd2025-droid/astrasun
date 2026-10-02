@@ -65,13 +65,16 @@ class _LoginScreenState extends State<LoginScreen> {
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 32),
-            TextField(
-              key: const Key('server'),
-              controller: _server,
-              keyboardType: TextInputType.url,
-              decoration: InputDecoration(labelText: s.t('Server address')),
-            ),
-            const SizedBox(height: 16),
+            // Only developer builds ask; the mill's app has the address built in.
+            if (widget.state.askForServer) ...[
+              TextField(
+                key: const Key('server'),
+                controller: _server,
+                keyboardType: TextInputType.url,
+                decoration: InputDecoration(labelText: s.t('Server address')),
+              ),
+              const SizedBox(height: 16),
+            ],
             TextField(
               key: const Key('user'),
               controller: _user,

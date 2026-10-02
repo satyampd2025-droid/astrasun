@@ -52,9 +52,11 @@ Future<AppState> startApp(
   WidgetTester tester,
   List<String> roles, {
   List<String>? languageCalls,
+  String fixedServer = 'https://mill.example.com',
 }) async {
   SharedPreferences.setMockInitialValues({});
   final state = AppState(
+    fixedServer: fixedServer,
     clientFactory: (url) => ErpNextClient(
       url,
       httpClient: fakeErpNext(roles, languageCalls: languageCalls),
@@ -67,10 +69,6 @@ Future<AppState> startApp(
 }
 
 Future<void> logIn(WidgetTester tester, {String password = 'secret'}) async {
-  await tester.enterText(
-    find.byKey(const Key('server')),
-    'https://mill.example.com',
-  );
   await tester.enterText(find.byKey(const Key('user')), 'ramesh@mill');
   await tester.enterText(find.byKey(const Key('password')), password);
   await tester.tap(find.byKey(const Key('login')));
@@ -129,5 +127,21 @@ void main() {
     await tester.tap(find.byKey(const Key('logout')));
     await tester.pumpAndSettle();
     expect(find.text('लॉग इन करें'), findsOneWidget);
+  });
+
+  testWidgets('staff are not asked for a server address', (tester) async {
+    await startApp(tester, ['Mill Sales']);
+    expect(find.byKey(const Key('server')), findsNothing);
+  });
+
+  testWidgets('developer builds ask for the server address', (tester) async {
+    await startApp(tester, ['Mill Sales'], fixedServer: '');
+    expect(find.byKey(const Key('server')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('server')),
+      'https://mill.example.com',
+    );
+    await logIn(tester);
+    expect(find.text('नया ऑर्डर'), findsOneWidget);
   });
 }

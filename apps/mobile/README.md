@@ -14,8 +14,12 @@ Screens behind the buttons arrive phase by phase; until then they open a "coming
 ```bash
 flutter pub get
 flutter test
-flutter run                         # on an Android phone, enter the server address on the login screen
+flutter run                         # developer build: asks for the server address
 flutter build apk --release         # installable APK
 flutter build web --base-href /assets/mobile-demo/   # browser preview served by ERPNext
+```
+Release builds for staff carry the mill server address, so nobody types it:
+```bash
+flutter build apk --release --dart-define=SERVER_URL=https://<mill-server>
 ```
 Fonts (Noto Sans, Noto Sans Devanagari) are bundled under `fonts/` with their OFL licence.
