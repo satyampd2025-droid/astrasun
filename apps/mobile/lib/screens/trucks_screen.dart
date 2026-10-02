@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
+import '../widgets/pull_to_reload.dart';
 
 enum TruckMode { invoice, dispatch }
 
@@ -44,9 +44,18 @@ class _TrucksScreenState extends State<TrucksScreen> {
         ),
       );
     }
+    _reload();
+  }
+
+  void _reload() {
     setState(() {
       _trucks = _fetch();
     });
+  }
+
+  Future<void> _refresh() {
+    _reload();
+    return settled(_trucks);
   }
 
   @override
@@ -56,42 +65,27 @@ class _TrucksScreenState extends State<TrucksScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(s.t(invoicing ? 'Bills and payments' : 'Send trucks')),
+        actions: [RefreshButton(onPressed: _refresh)],
       ),
-      body: FutureBuilder<List<LoadingTask>>(
+      body: PullToReload.list<LoadingTask>(
         future: _trucks,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final trucks = snap.data!;
-          if (trucks.isEmpty) {
-            return Center(
-              child: Text(
-                s.t('No trucks waiting'),
-                key: const Key('no-trucks'),
-                style: Theme.of(context).textTheme.titleLarge,
+        onRefresh: _refresh,
+        emptyText: s.t('No trucks waiting'),
+        emptyKey: const Key('no-trucks'),
+        cards: (context, trucks) => [
+          for (final t in trucks)
+            _TruckCard(
+              key: ValueKey(t.id),
+              task: t,
+              mode: widget.mode,
+              onInvoice: (eway) => _run(
+                () => widget.client.invoiceTruck(t, eway),
+                'Invoice made',
               ),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final t in trucks)
-                _TruckCard(
-                  key: ValueKey(t.id),
-                  task: t,
-                  mode: widget.mode,
-                  onInvoice: (eway) => _run(
-                    () => widget.client.invoiceTruck(t, eway),
-                    'Invoice made',
-                  ),
-                  onDispatch: () =>
-                      _run(() => widget.client.dispatchTruck(t), 'Truck left'),
-                ),
-            ],
-          );
-        },
+              onDispatch: () =>
+                  _run(() => widget.client.dispatchTruck(t), 'Truck left'),
+            ),
+        ],
       ),
     );
   }

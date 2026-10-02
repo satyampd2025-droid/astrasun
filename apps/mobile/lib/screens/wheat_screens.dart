@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
+import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
 String kg(double v) => '${v.round()} kg';
@@ -158,33 +158,28 @@ abstract class _TruckListState<T extends StatefulWidget> extends State<T> {
     });
   }
 
+  Future<void> refresh() {
+    reload();
+    return settled(trucks);
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t(title))),
-      body: FutureBuilder<List<WheatTruck>>(
+      appBar: AppBar(
+        title: Text(s.t(title)),
+        actions: [RefreshButton(onPressed: refresh)],
+      ),
+      body: PullToReload<List<WheatTruck>>(
         future: trucks,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final list = snap.data!.where(wanted).toList();
-          if (list.isEmpty) {
-            return Center(
-              child: Text(
-                s.t('No trucks waiting'),
-                key: const Key('no-trucks'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [for (final t in list) card(context, t)],
-          );
-        },
+        onRefresh: refresh,
+        isEmpty: (rows) => !rows.any(wanted),
+        emptyText: s.t('No trucks waiting'),
+        emptyKey: const Key('no-trucks'),
+        builder: (context, rows) => [
+          for (final t in rows.where(wanted)) card(context, t),
+        ],
       ),
     );
   }

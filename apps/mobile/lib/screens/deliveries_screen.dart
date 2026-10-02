@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
+import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
 /// Driver: trucks on the road. Confirm each one with the receiver's name.
@@ -60,70 +60,66 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         SnackBar(content: Text(s.saveFailed(e))),
       );
     }
+    _reload();
+  }
+
+  void _reload() {
     setState(() {
       _trucks = widget.client.myDeliveries();
     });
+  }
+
+  Future<void> _refresh() {
+    _reload();
+    return settled(_trucks);
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('My deliveries'))),
-      body: FutureBuilder<List<LoadingTask>>(
+      appBar: AppBar(
+        title: Text(s.t('My deliveries')),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload.list<LoadingTask>(
         future: _trucks,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final trucks = snap.data!;
-          if (trucks.isEmpty) {
-            return Center(
-              child: Text(
-                s.t('No deliveries waiting'),
-                key: const Key('no-deliveries'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final t in trucks)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          t.customerName,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(s.t('Vehicle {0}', [t.vehicleNo ?? '-'])),
-                        const SizedBox(height: 8),
-                        for (final i in t.items)
-                          Text(
-                            '${i.itemName}: ${i.qty.round()} ${s.t('bags')}',
-                            style: const TextStyle(fontSize: 18),
-                          ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          key: Key('deliver-${t.id}'),
-                          icon: const Icon(Icons.verified_outlined),
-                          label: Text(s.t('Confirm delivery')),
-                          onPressed: () => _deliver(t),
-                        ),
-                      ],
+        onRefresh: _refresh,
+        emptyText: s.t('No deliveries waiting'),
+        emptyKey: const Key('no-deliveries'),
+        cards: (context, trucks) => [
+          for (final t in trucks)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.customerName,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
+                    Text(s.t('Vehicle {0}', [t.vehicleNo ?? '-'])),
+                    const SizedBox(height: 8),
+                    for (final i in t.items)
+                      Text(
+                        '${i.itemName}: ${i.qty.round()} ${s.t('bags')}',
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: Key('deliver-${t.id}'),
+                      icon: const Icon(Icons.verified_outlined),
+                      label: Text(s.t('Confirm delivery')),
+                      onPressed: () => _deliver(t),
+                    ),
+                  ],
                 ),
-            ],
-          );
-        },
+              ),
+            ),
+        ],
       ),
     );
   }

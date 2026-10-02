@@ -72,6 +72,17 @@ const Map<String, Map<String, String>> _strings = {
     'Approved': 'मंज़ूर',
     'Rejected': 'मना किया',
     'Sent Back': 'वापस भेजा',
+    // Where an order stands (the same words on every screen)
+    'Waiting for approval': 'मंज़ूरी का इंतज़ार',
+    'On the way': 'रास्ते में',
+    'Delivered, payment pending': 'पहुंच गया, भुगतान बाकी',
+    'Part paid': 'आंशिक भुगतान',
+    'Paid': 'भुगतान हो गया',
+    'Cancelled': 'रद्द',
+    'Order status': 'ऑर्डर की स्थिति',
+    'All orders': 'सभी ऑर्डर',
+    'Try again': 'फिर कोशिश करें',
+    'Refresh': 'ताज़ा करें',
     // Loading
     'bags': 'बोरी',
     'Waiting': 'इंतज़ार में',

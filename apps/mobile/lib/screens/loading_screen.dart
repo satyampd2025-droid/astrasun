@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
+import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
 /// Warehouse: approved orders to load onto trucks.
@@ -22,6 +22,11 @@ class _LoadingScreenState extends State<LoadingScreen> {
     setState(() {
       _tasks = widget.client.loadingQueue();
     });
+  }
+
+  Future<void> _refresh() {
+    _reload();
+    return settled(_tasks);
   }
 
   Future<void> _run(Future<LoadingTask> Function() action) async {
@@ -50,38 +55,25 @@ class _LoadingScreenState extends State<LoadingScreen> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('Loading queue'))),
-      body: FutureBuilder<List<LoadingTask>>(
+      appBar: AppBar(
+        title: Text(s.t('Loading queue')),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload.list<LoadingTask>(
         future: _tasks,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final tasks = snap.data!;
-          if (tasks.isEmpty) {
-            return Center(
-              child: Text(
-                s.t('Nothing to load'),
-                key: const Key('nothing-to-load'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final t in tasks)
-                _TaskCard(
-                  key: ValueKey('${t.id}-${t.status}'),
-                  task: t,
-                  onStart: () => _run(() => widget.client.startLoading(t)),
-                  onLoaded: (vehicle, loaded) =>
-                      _run(() => widget.client.markLoaded(t, vehicle, loaded)),
-                ),
-            ],
-          );
-        },
+        onRefresh: _refresh,
+        emptyText: s.t('Nothing to load'),
+        emptyKey: const Key('nothing-to-load'),
+        cards: (context, tasks) => [
+          for (final t in tasks)
+            _TaskCard(
+              key: ValueKey('${t.id}-${t.status}'),
+              task: t,
+              onStart: () => _run(() => widget.client.startLoading(t)),
+              onLoaded: (vehicle, loaded) =>
+                  _run(() => widget.client.markLoaded(t, vehicle, loaded)),
+            ),
+        ],
       ),
     );
   }

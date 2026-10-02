@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
+import '../widgets/pull_to_reload.dart';
 
 const _alertIcons = {
   'weight': Icons.scale_outlined,
@@ -21,30 +21,51 @@ Widget _alertTile(MillAlert a) => Card(
   ),
 );
 
-class _Loader extends StatelessWidget {
+class _Loader extends StatefulWidget {
   const _Loader({
     required this.client,
     required this.title,
-    required this.body,
+    required this.children,
+    this.emptyText,
+    this.emptyKey,
   });
   final ErpNextClient client;
   final String title;
-  final Widget Function(BuildContext, DayView) body;
+  final List<Widget> Function(BuildContext, DayView) children;
+
+  /// Shown instead of the children when there are no alerts (the Alerts screen).
+  final String? emptyText;
+  final Key? emptyKey;
+
+  @override
+  State<_Loader> createState() => _LoaderState();
+}
+
+class _LoaderState extends State<_Loader> {
+  late Future<DayView> _day = widget.client.today();
+
+  Future<void> _refresh() {
+    setState(() {
+      _day = widget.client.today();
+    });
+    return settled(_day);
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t(title))),
-      body: FutureBuilder<DayView>(
-        future: client.today(),
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          return body(context, snap.data!);
-        },
+      appBar: AppBar(
+        title: Text(s.t(widget.title)),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload<DayView>(
+        future: _day,
+        onRefresh: _refresh,
+        isEmpty: (d) => d.alerts.isEmpty,
+        emptyText: widget.emptyText == null ? null : s.t(widget.emptyText!),
+        emptyKey: widget.emptyKey,
+        builder: widget.children,
       ),
     );
   }
@@ -92,73 +113,61 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) => _Loader(
     client: client,
     title: 'Today at the mill',
-    body: (context, d) {
+    children: (context, d) {
       final s = S.of(context);
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 1.15,
-            children: [
-              _Tile(
-                s.t('Sales booked'),
-                rupees(d.salesBooked),
-                key: const Key('tile-sales'),
-              ),
-              _Tile(s.t('Invoiced'), rupees(d.invoiced)),
-              _Tile(
-                s.t('Collected'),
-                rupees(d.collected),
-                key: const Key('tile-collected'),
-              ),
-              _Tile(
-                s.t('Dues'),
-                rupees(d.duesTotal),
-                key: const Key('tile-dues'),
-              ),
-              _Tile(s.t('Wheat ground'), '${d.wheatGroundKg.round()} kg'),
-              _Tile(
-                s.t('Extraction'),
-                '${d.extractionPct.toStringAsFixed(1)}%',
-              ),
-              _Tile(
-                s.t('Orders to approve'),
-                '${d.pendingApprovals}',
-                key: const Key('tile-approvals'),
-              ),
-              _Tile(s.t('Wheat trucks in yard'), '${d.trucksInYard}'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            s.t('Dues by age'),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          for (final e in d.ageing.entries)
-            ListTile(
-              dense: true,
-              title: Text('${e.key} ${s.t('days')}'),
-              trailing: Text(
-                rupees(e.value),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+      return [
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.15,
+          children: [
+            _Tile(
+              s.t('Sales booked'),
+              rupees(d.salesBooked),
+              key: const Key('tile-sales'),
             ),
-          const SizedBox(height: 8),
-          Text(
-            '${s.t('Alerts')} (${d.alerts.length})',
-            key: const Key('alerts-title'),
-            style: Theme.of(context).textTheme.titleMedium,
+            _Tile(s.t('Invoiced'), rupees(d.invoiced)),
+            _Tile(
+              s.t('Collected'),
+              rupees(d.collected),
+              key: const Key('tile-collected'),
+            ),
+            _Tile(
+              s.t('Dues'),
+              rupees(d.duesTotal),
+              key: const Key('tile-dues'),
+            ),
+            _Tile(s.t('Wheat ground'), '${d.wheatGroundKg.round()} kg'),
+            _Tile(s.t('Extraction'), '${d.extractionPct.toStringAsFixed(1)}%'),
+            _Tile(
+              s.t('Orders to approve'),
+              '${d.pendingApprovals}',
+              key: const Key('tile-approvals'),
+            ),
+            _Tile(s.t('Wheat trucks in yard'), '${d.trucksInYard}'),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(s.t('Dues by age'), style: Theme.of(context).textTheme.titleMedium),
+        for (final e in d.ageing.entries)
+          ListTile(
+            dense: true,
+            title: Text('${e.key} ${s.t('days')}'),
+            trailing: Text(
+              rupees(e.value),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
           ),
-          if (d.alerts.isEmpty) Text(s.t('Nothing needs a look')),
-          for (final a in d.alerts.take(3)) _alertTile(a),
-        ],
-      );
+        const SizedBox(height: 8),
+        Text(
+          '${s.t('Alerts')} (${d.alerts.length})',
+          key: const Key('alerts-title'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        if (d.alerts.isEmpty) Text(s.t('Nothing needs a look')),
+        for (final a in d.alerts.take(3)) _alertTile(a),
+      ];
     },
   );
 }
@@ -172,21 +181,8 @@ class AlertsScreen extends StatelessWidget {
   Widget build(BuildContext context) => _Loader(
     client: client,
     title: 'Alerts',
-    body: (context, d) {
-      final s = S.of(context);
-      if (d.alerts.isEmpty) {
-        return Center(
-          child: Text(
-            s.t('Nothing needs a look'),
-            key: const Key('no-alerts'),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        );
-      }
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [for (final a in d.alerts) _alertTile(a)],
-      );
-    },
+    emptyText: 'Nothing needs a look',
+    emptyKey: const Key('no-alerts'),
+    children: (context, d) => [for (final a in d.alerts) _alertTile(a)],
   );
 }

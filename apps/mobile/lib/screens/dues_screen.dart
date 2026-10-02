@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
+import '../widgets/pull_to_reload.dart';
 
 /// Who owes money. Driver and accounts receive payment here; it is matched
 /// to the customer's oldest bills first.
@@ -114,78 +114,71 @@ class _DuesScreenState extends State<DuesScreen> {
         ),
       );
     }
+    _reload();
+  }
+
+  void _reload() {
     setState(() {
       _dues = widget.client.dues();
     });
+  }
+
+  Future<void> _refresh() {
+    _reload();
+    return settled(_dues);
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('Customer dues'))),
-      body: FutureBuilder<List<Due>>(
+      appBar: AppBar(
+        title: Text(s.t('Customer dues')),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload.list<Due>(
         future: _dues,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final dues = snap.data!;
-          if (dues.isEmpty) {
-            return Center(
-              child: Text(
-                s.t('Nobody owes money'),
-                key: const Key('no-dues'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final d in dues)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          d.customerName,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          rupees(d.due),
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          s.t('{0} bills, oldest {1}', [
-                            d.bills,
-                            d.oldest ?? '-',
-                          ]),
-                        ),
-                        if (widget.canCollect) ...[
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            key: Key('receive-${d.customer}'),
-                            icon: const Icon(Icons.payments_outlined),
-                            label: Text(s.t('Receive payment')),
-                            onPressed: () => _receive(d),
-                          ),
-                        ],
-                      ],
+        onRefresh: _refresh,
+        emptyText: s.t('Nobody owes money'),
+        emptyKey: const Key('no-dues'),
+        cards: (context, dues) => [
+          for (final d in dues)
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      d.customerName,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
+                    Text(
+                      rupees(d.due),
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      s.t('{0} bills, oldest {1}', [d.bills, d.oldest ?? '-']),
+                    ),
+                    if (widget.canCollect) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        key: Key('receive-${d.customer}'),
+                        icon: const Icon(Icons.payments_outlined),
+                        label: Text(s.t('Receive payment')),
+                        onPressed: () => _receive(d),
+                      ),
+                    ],
+                  ],
                 ),
-            ],
-          );
-        },
+              ),
+            ),
+        ],
       ),
     );
   }
