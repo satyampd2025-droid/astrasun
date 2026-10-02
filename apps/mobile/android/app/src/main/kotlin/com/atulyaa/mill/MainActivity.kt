@@ -1,4 +1,4 @@
-package `in`.atulyaa.atulyaa_mill
+package com.atulyaa.mill
 
 import io.flutter.embedding.android.FlutterActivity
 
