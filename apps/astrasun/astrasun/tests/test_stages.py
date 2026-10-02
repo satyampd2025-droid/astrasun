@@ -77,9 +77,7 @@ class TestStageOfAnOrder(unittest.TestCase):
 
 	def test_timeline_marks_what_is_done_where_it_is_and_what_is_left(self):
 		got = self.stage(trucks=["Dispatched"])
-		self.assertEqual(
-			self.states(got), ["done", "done", "done", "done", "current", "todo", "todo"]
-		)
+		self.assertEqual(self.states(got), ["done", "done", "done", "done", "current", "todo", "todo"])
 
 	def test_timeline_names_the_payment_state_on_the_delivered_row(self):
 		got = self.delivered(10000, 4000)

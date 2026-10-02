@@ -100,9 +100,7 @@ def _timeline(stage, step):
 	return rows
 
 
-def describe(
-	approval, trucks=(), fully_delivered=False, billed=0, outstanding=0, cancelled=False
-):
+def describe(approval, trucks=(), fully_delivered=False, billed=0, outstanding=0, cancelled=False):
 	"""The stage of an order, its colour, its place on the ladder and the timeline rows.
 
 	`trucks` are the loading statuses of the order's Delivery Notes; `billed` and
