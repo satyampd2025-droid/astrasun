@@ -105,11 +105,15 @@ class TestMVPAcceptance(MillFixture):
 		self.assertFalse(order["credit_breach"])
 		self.assertTrue(order["below_min_price"])  # list price is higher than 400
 		# 7. Management approves; the approval is auditable
+		# Below list price, so a manager is refused and the owner decides
 		frappe.set_user(self.manager)
+		with self.assertRaises(orders.CreditOverrideError):
+			orders.approve(order["name"])
+		frappe.set_user(self.owner)
 		orders.approve(order["name"], "OK for this dealer")
 		self.assertTrue(
 			frappe.db.exists(
-				"Critical Change Log", {"reference_name": order["name"], "action": "Approval", "user": self.manager}
+				"Critical Change Log", {"reference_name": order["name"], "action": "Approval", "user": self.owner}
 			)
 		)
 		# 8. Warehouse gets the loading task and confirms what was actually loaded

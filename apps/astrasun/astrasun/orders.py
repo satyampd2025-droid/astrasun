@@ -174,6 +174,11 @@ def approve(name, note=None):
 			_("This order is over the customer's credit limit. Only the owner can approve it."),
 			CreditOverrideError,
 		)
+	if doc.astrasun_below_price and OWNER_ROLE not in roles:
+		frappe.throw(
+			_("This order is below the list price. Only the owner can approve it."),
+			CreditOverrideError,
+		)
 	doc.astrasun_approval_status = APPROVED
 	doc.astrasun_approved_by = frappe.session.user
 	doc.astrasun_approval_note = note

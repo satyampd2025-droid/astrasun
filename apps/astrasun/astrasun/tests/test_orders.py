@@ -86,3 +86,17 @@ class TestOrders(MillFixture):
 		data = orders.catalog()
 		self.assertIn(customer, [c["name"] for c in data["customers"]])
 		self.assertIn(ITEM, [i["item_code"] for i in data["items"]])
+
+	def test_below_list_price_needs_the_owner(self):
+		frappe.set_user("Administrator")
+		if not frappe.db.exists("Item Price", {"item_code": ITEM, "selling": 1}):
+			frappe.get_doc(
+				{"doctype": "Item Price", "item_code": ITEM, "price_list": "Standard Selling", "selling": 1, "price_list_rate": 1500}
+			).insert()
+		order = self._order(self._customer(limit=1000000), rate=1000)
+		self.assertTrue(order["below_min_price"])
+		frappe.set_user(self.manager)
+		with self.assertRaises(orders.CreditOverrideError):
+			orders.approve(order["name"])
+		frappe.set_user(self.owner)
+		self.assertEqual(orders.approve(order["name"], "Dealer discount")["status"], "Approved")
