@@ -48,5 +48,6 @@ Notes
 - Separate stacks in one AWS account is separate resources. For the strongest wall (separate billing and access) use two AWS accounts and a different `AWS_PROFILE` per environment; the same files work. Your $100 credit belongs to one account.
 - The phone app for test must be built pointing at the test address, so test and prod APKs are different builds and a tester can never touch real data.
 - No SSH port is open; log in through AWS Systems Manager Session Manager.
+- Updating a running environment (new code or a fixed image): open the server in Session Manager, then `sudo -i`, `cd /opt/astrasun && bash docker/deploy.sh`. It pulls the branch, rebuilds the image, recreates the containers and migrates the site, and stops with an ERROR line if the India Compliance web script is missing. About 5 minutes, the site is down for about 2; the database (RDS) and uploaded files are untouched.
 - The repository is private, so the server needs a read-only GitHub token stored in Secrets Manager (`GITHUB_TOKEN_SECRET_ARN`) until the code is moved to a public or deploy-key setup.
 - Offline checks only so far (cfn-lint passes); never run in a real account.
