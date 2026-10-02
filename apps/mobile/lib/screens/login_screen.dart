@@ -55,15 +55,24 @@ class _LoginScreenState extends State<LoginScreen> {
               child: LanguageSwitch(state: widget.state),
             ),
             const SizedBox(height: 24),
-            Icon(
-              Icons.grain,
-              size: 72,
-              color: Theme.of(context).colorScheme.primary,
+            Center(
+              child: Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: const Icon(Icons.grain, size: 52, color: Colors.white),
+              ),
             ),
+            const SizedBox(height: 16),
             Text(
               s.t('Atulyaa Mill'),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 32),
             if (!widget.state.canLogIn)

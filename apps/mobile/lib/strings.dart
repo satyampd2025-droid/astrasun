@@ -15,6 +15,9 @@ const Map<String, Map<String, String>> _strings = {
         'सर्वर से संपर्क नहीं हो पा रहा। इंटरनेट देखें।',
     'Namaste, {0}': 'नमस्ते, {0}',
     'What to do now': 'अभी क्या करना है',
+    'Next for you': 'आपका अगला काम',
+    'Tap to start': 'शुरू करने के लिए दबाएं',
+    'More work': 'और काम',
     'No work assigned to your role yet. Ask the manager.':
         'आपके काम के लिए अभी कुछ तय नहीं है। मैनेजर से पूछें।',
     'Coming soon': 'जल्द आ रहा है',
