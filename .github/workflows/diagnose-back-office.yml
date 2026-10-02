@@ -50,6 +50,7 @@ jobs:
         run: curl -fsS --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors http://localhost:8080/api/method/ping
 
       - name: Reproduce in a real browser
+        timeout-minutes: 12
         working-directory: .github/diagnose
         run: |
           npm init -y >/dev/null
