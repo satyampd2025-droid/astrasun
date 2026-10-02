@@ -3,7 +3,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BRANCH=${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
-git fetch origin "$BRANCH" && git reset --hard "origin/$BRANCH"
+if [ "${1:-}" != "--pulled" ]; then
+  git fetch origin "$BRANCH" && git reset --hard "origin/$BRANCH"
+  # The pull may have replaced this very script. Continue with the new copy: bash reads a script
+  # as it runs, so carrying on in the old one would skip or garble the lines that changed.
+  exec bash docker/deploy.sh --pulled
+fi
 docker build -f docker/Dockerfile -t astrasun:dev .
 cd docker
 C="docker compose -f compose.yml -f compose.prod.yml"
