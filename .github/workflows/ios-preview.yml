@@ -1,0 +1,67 @@
+# Builds the iPhone app on every push to apps/mobile and publishes an UNSIGNED
+# .ipa to the same release as the Android APK (apps/mobile/build-target.env).
+# An iPhone only runs a signed app: sign it with Sideloadly/AltStore (free Apple
+# ID, 7 days) or add the Apple Developer secrets for TestFlight later.
+name: iOS preview IPA
+
+on:
+  push:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-preview-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.5"
+          channel: stable
+          cache: true
+
+      - name: Pick server and release
+        run: |
+          SERVER_URL="${{ vars.MILL_SERVER_URL }}"; RELEASE_TAG=app-preview
+          [ -f build-target.env ] && . ./build-target.env
+          echo "SERVER_URL=$SERVER_URL" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+
+      - run: flutter pub get
+
+      - name: Build (unsigned)
+        run: >
+          flutter build ios --release --no-codesign
+          --build-number=${{ github.run_number }}
+          --dart-define=SERVER_URL=$SERVER_URL
+
+      - name: Pack the .ipa
+        run: |
+          rm -rf Payload && mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr ../../atulyaa-mill-unsigned.ipa Payload
+
+      - name: Publish next to the APK
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="iPhone build ${{ github.run_number }} from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7} (unsigned: sign with Sideloadly or AltStore). Server: ${SERVER_URL:-none, demo only}."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" atulyaa-mill-unsigned.ipa --clobber
+          else
+            gh release create "$RELEASE_TAG" atulyaa-mill-unsigned.ipa --prerelease --title "Phone app ($RELEASE_TAG)" --notes "$notes" --target "$GITHUB_SHA"
+          fi
