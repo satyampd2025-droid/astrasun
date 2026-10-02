@@ -7,6 +7,8 @@ git fetch origin "$BRANCH" && git reset --hard "origin/$BRANCH"
 docker build -f docker/Dockerfile -t astrasun:dev .
 cd docker
 C="docker compose -f compose.yml -f compose.prod.yml"
+# Managed database (AWS RDS): use it instead of the local db container
+grep -q ^DB_HOST= .env && C="$C -f compose.rds.yml"
 $C up -d
 # Wait for the site to exist (first run creates it), then apply updates
 until $C exec -T backend test -d "sites/$(grep ^SITE_NAME .env | cut -d= -f2)"; do sleep 5; done

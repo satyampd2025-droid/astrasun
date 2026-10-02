@@ -25,7 +25,15 @@ Parameters:
     Description: Secrets Manager secret holding a read-only GitHub token (needed while the repository is private)
   GitBranch:
     Type: String
-    Default: claude/project-thread-bqz906
+    Default: claude/project-thread-z9q9jp
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.small
+    Description: "Managed MariaDB (RDS) size. db.t4g.small is 2 GB."
+  DbStorageGb:
+    Type: Number
+    Default: 20
+    MinValue: 20
   VpcCidr:
     Type: String
     Default: 10.20.0.0/24
@@ -33,6 +41,7 @@ Parameters:
 
 Conditions:
   UseToken: !Not [!Equals [!Ref GitHubTokenSecretArn, ""]]
+  IsProd: !Equals [!Ref EnvName, prod]
 
 Resources:
   Vpc:
@@ -54,9 +63,24 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref VpcCidr
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 6]]
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [0, !GetAZs ""]
+
+  # Database subnets: no internet route; RDS needs two availability zones
+  DbSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 6]]
+      AvailabilityZone: !Select [0, !GetAZs ""]
+
+  DbSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 6]]
+      AvailabilityZone: !Select [1, !GetAZs ""]
 
   RouteTable:
     Type: AWS::EC2::RouteTable
@@ -82,6 +106,56 @@ Resources:
       SecurityGroupIngress:
         - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
         - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+
+  DbFirewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database reachable only from this environment server
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 3306, ToPort: 3306, SourceSecurityGroupId: !Ref Firewall }
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "astrasun ${EnvName} database subnets"
+      SubnetIds: [!Ref DbSubnetA, !Ref DbSubnetB]
+
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: ERPNext needs utf8mb4
+      Family: mariadb10.6
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
+
+  # Managed MariaDB. The master password is generated and kept by RDS in Secrets Manager.
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "astrasun-${EnvName}-db"
+      Engine: mariadb
+      EngineVersion: "10.6.28"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbStorageGb
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      MasterUsername: admin
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups: [!GetAtt DbFirewall.GroupId]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: "20:30-21:30"
+      DeletionProtection: !If [IsProd, true, false]
+      CopyTagsToSnapshot: true
+      Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}-db" }]
 
   BackupBucket:
     Type: AWS::S3::Bucket
@@ -132,7 +206,10 @@ Resources:
                 Resource: [!GetAtt BackupBucket.Arn, !Sub "${BackupBucket.Arn}/*"]
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !If [UseToken, [!Ref AdminSecret, !Ref GitHubTokenSecretArn], [!Ref AdminSecret]]
+                Resource: !If
+                  - UseToken
+                  - [!Ref AdminSecret, !GetAtt Database.MasterUserSecret.SecretArn, !Ref GitHubTokenSecretArn]
+                  - [!Ref AdminSecret, !GetAtt Database.MasterUserSecret.SecretArn]
 
   ServerProfile:
     Type: AWS::IAM::InstanceProfile
@@ -161,6 +238,7 @@ Resources:
             ufw allow 80 && ufw allow 443 && ufw --force enable
             REGION=${AWS::Region}
             ADMIN_PASSWORD=$(aws secretsmanager get-secret-value --region $REGION --secret-id ${AdminSecret} --query SecretString --output text)
+            DB_SECRET=$(aws secretsmanager get-secret-value --region $REGION --secret-id ${DbSecretArn} --query SecretString --output text)
             URL=https://github.com/satyampd2025-droid/astrasun.git
             ${TokenLine}
             git clone -b ${GitBranch} $URL /opt/astrasun
@@ -169,7 +247,9 @@ Resources:
             SITE_NAME=${DomainName}
             DOMAIN=${DomainName}
             ADMIN_PASSWORD=$ADMIN_PASSWORD
-            DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+            DB_HOST=${Database.Endpoint.Address}
+            DB_ROOT_USER=$(echo "$DB_SECRET" | jq -r .username)
+            DB_ROOT_PASSWORD=$(echo "$DB_SECRET" | jq -r .password)
             ENV
             chmod 600 docker/.env
             # Nightly backup 02:00 (database and files), copied to this environment's own bucket
@@ -178,6 +258,7 @@ Resources:
             set -e
             cd /opt/astrasun/docker
             C="docker compose -f compose.yml -f compose.prod.yml"
+            grep -q ^DB_HOST= .env && C="$C -f compose.rds.yml"
             SITE=$(grep ^SITE_NAME .env | cut -d= -f2)
             $C exec -T backend bench --site $SITE backup --with-files
             rm -rf /var/backups/astrasun && mkdir -p /var/backups/astrasun
@@ -188,7 +269,8 @@ Resources:
             chmod +x /usr/local/bin/astrasun-backup
             echo "0 2 * * * root /usr/local/bin/astrasun-backup >> /var/log/astrasun-backup.log 2>&1" > /etc/cron.d/astrasun-backup
             bash docker/deploy.sh
-          - TokenLine: !If
+          - DbSecretArn: !GetAtt Database.MasterUserSecret.SecretArn
+            TokenLine: !If
               - UseToken
               - !Sub "URL=https://x-access-token:$(aws secretsmanager get-secret-value --region $REGION --secret-id ${GitHubTokenSecretArn} --query SecretString --output text)@github.com/satyampd2025-droid/astrasun.git"
               - "true"
@@ -203,6 +285,9 @@ Outputs:
   ServerAddress:
     Description: "Create a DNS A record for DomainName pointing to this address"
     Value: !Ref Address
+  DatabaseAddress:
+    Description: Managed MariaDB endpoint (private, reachable only from the server)
+    Value: !GetAtt Database.Endpoint.Address
   BackupBucketName:
     Value: !Ref BackupBucket
   AdminPasswordSecret:

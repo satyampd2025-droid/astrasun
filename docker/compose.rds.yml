@@ -1,0 +1,9 @@
+# Managed database overlay: the stack uses AWS RDS (DB_HOST in docker/.env) instead of the local db container.
+#   docker compose -f compose.yml -f compose.prod.yml -f compose.rds.yml up -d
+# Needs DB_HOST, DB_ROOT_USER and DB_ROOT_PASSWORD in docker/.env (written by infra/aws/single-server/server.yaml).
+services:
+  db:
+    profiles: ["local-db"]
+
+  configurator:
+    depends_on: !reset {}

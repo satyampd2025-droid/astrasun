@@ -4,16 +4,17 @@
 #
 #   ./deploy.sh test mill-test.example.com            # dry run
 #   ./deploy.sh prod mill.example.com --apply
-# Optional: REGION (default ap-south-1), INSTANCE_TYPE, GITHUB_TOKEN_SECRET_ARN, AWS_PROFILE (use a different
+# Test and prod use the same sizes on purpose (test must match prod).
+# Optional: REGION (default ap-southeast-2, the only region this AWS account allows), INSTANCE_TYPE, GITHUB_TOKEN_SECRET_ARN, AWS_PROFILE (use a different
 # profile, or a different AWS account, for each environment if you want the strongest separation).
 set -euo pipefail
 cd "$(dirname "$0")"
 ENV_NAME=${1:?usage: deploy.sh test|prod <domain> [--apply]}
 DOMAIN=${2:?usage: deploy.sh test|prod <domain> [--apply]}
-REGION=${REGION:-ap-south-1}
+REGION=${REGION:-ap-southeast-2}
 case "$ENV_NAME" in
   prod) TYPE=${INSTANCE_TYPE:-t3.medium}; CIDR=10.20.0.0/24 ;;
-  test) TYPE=${INSTANCE_TYPE:-t3.small};  CIDR=10.21.0.0/24 ;;
+  test) TYPE=${INSTANCE_TYPE:-t3.medium};  CIDR=10.21.0.0/24 ;;
   *) echo "first argument must be test or prod"; exit 1 ;;
 esac
 APPLY=no; [ "${3:-}" = "--apply" ] && APPLY=yes
