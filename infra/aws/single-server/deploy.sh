@@ -14,8 +14,8 @@ ENV_NAME=${1:?usage: deploy.sh test|prod <domain> [--apply]}
 DOMAIN=${2:?usage: deploy.sh test|prod <domain> [--apply]}
 REGION=${REGION:-ap-southeast-2}
 case "$ENV_NAME" in
-  prod) TYPE=${INSTANCE_TYPE:-t3.medium}; CIDR=10.20.0.0/24 ;;
-  test) TYPE=${INSTANCE_TYPE:-t3.medium};  CIDR=10.21.0.0/24 ;;
+  prod) TYPE=${INSTANCE_TYPE:-c7i-flex.large}; CIDR=10.20.0.0/24 ;;
+  test) TYPE=${INSTANCE_TYPE:-c7i-flex.large};  CIDR=10.21.0.0/24 ;;
   *) echo "first argument must be test or prod"; exit 1 ;;
 esac
 APPLY=no; [ "${3:-}" = "--apply" ] && APPLY=yes
