@@ -5,7 +5,7 @@ import 'package:atulyaa_mill/screens/dashboard_screen.dart';
 import 'package:atulyaa_mill/screens/deliveries_screen.dart';
 import 'package:atulyaa_mill/screens/dues_screen.dart';
 import 'package:atulyaa_mill/screens/loading_screen.dart';
-import 'package:atulyaa_mill/screens/my_orders_screen.dart';
+import 'package:atulyaa_mill/screens/order_list_screen.dart';
 import 'package:atulyaa_mill/screens/production_screens.dart';
 import 'package:atulyaa_mill/screens/reports_screen.dart';
 import 'package:atulyaa_mill/screens/trucks_screen.dart';
@@ -26,15 +26,22 @@ class _Counting extends DemoClient {
   @override
   Future<List<Order>> myOrders() => _hit('orders', super.myOrders);
   @override
-  Future<List<Order>> pendingApprovals() => _hit('orders', super.pendingApprovals);
+  Future<List<Order>> pendingApprovals() =>
+      _hit('orders', super.pendingApprovals);
   @override
-  Future<List<LoadingTask>> loadingQueue() => _hit('trucks', super.loadingQueue);
+  Future<List<Order>> allOrders() => _hit('orders', super.allOrders);
   @override
-  Future<List<LoadingTask>> trucksToInvoice() => _hit('trucks', super.trucksToInvoice);
+  Future<List<LoadingTask>> loadingQueue() =>
+      _hit('trucks', super.loadingQueue);
   @override
-  Future<List<LoadingTask>> trucksToDispatch() => _hit('trucks', super.trucksToDispatch);
+  Future<List<LoadingTask>> trucksToInvoice() =>
+      _hit('trucks', super.trucksToInvoice);
   @override
-  Future<List<LoadingTask>> myDeliveries() => _hit('trucks', super.myDeliveries);
+  Future<List<LoadingTask>> trucksToDispatch() =>
+      _hit('trucks', super.trucksToDispatch);
+  @override
+  Future<List<LoadingTask>> myDeliveries() =>
+      _hit('trucks', super.myDeliveries);
   @override
   Future<List<Due>> dues() => _hit('dues', super.dues);
   @override
@@ -59,6 +66,7 @@ void main() {
   final screens = <String, (Widget Function(_Counting), String)>{
     'My orders': ((c) => MyOrdersScreen(client: c), 'orders'),
     'Approve orders': ((c) => ApprovalsScreen(client: c), 'orders'),
+    'All orders': ((c) => AllOrdersScreen(client: c), 'orders'),
     'Loading queue': ((c) => LoadingScreen(client: c), 'trucks'),
     'Bills and payments': (
       (c) => TrucksScreen(client: c, mode: TruckMode.invoice),
@@ -94,7 +102,9 @@ void main() {
       expect(client.calls[asked], 2);
     });
 
-    testWidgets('${entry.key}: the refresh button loads it again', (tester) async {
+    testWidgets('${entry.key}: the refresh button loads it again', (
+      tester,
+    ) async {
       final client = _Counting();
       await tester.pumpWidget(
         MaterialApp(locale: const Locale('en'), home: build(client)),

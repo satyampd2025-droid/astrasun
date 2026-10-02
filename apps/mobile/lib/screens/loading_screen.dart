@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
@@ -137,7 +138,7 @@ class _TaskCardState extends State<_TaskCard> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                Chip(label: Text(s.t(t.status))),
+                StageChip(t.stage, key: Key('stage-${t.id}')),
               ],
             ),
             Text(t.salesOrder),

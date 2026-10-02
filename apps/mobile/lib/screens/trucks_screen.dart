@@ -123,7 +123,17 @@ class _TruckCardState extends State<_TruckCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.customerName, style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t.customerName,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                StageChip(t.stage, key: Key('stage-${t.id}')),
+              ],
+            ),
             Text(s.t('Vehicle {0}', [t.vehicleNo ?? '-'])),
             const SizedBox(height: 8),
             for (final i in t.items)

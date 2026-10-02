@@ -13,12 +13,15 @@ class Task {
 const Map<String, List<Task>> roleTasks = {
   'Mill Owner': [
     Task('Approve orders', Icons.verified_outlined, 2),
+    Task('All orders', Icons.list_alt_outlined, 2),
     Task('Today at the mill', Icons.dashboard_outlined, 5),
     Task('Customer dues', Icons.account_balance_wallet_outlined, 2),
     Task('Alerts', Icons.notifications_active_outlined, 5),
     Task('Reports', Icons.bar_chart, 5),
   ],
   'Mill Manager': [
+    Task('Approve orders', Icons.verified_outlined, 2),
+    Task('All orders', Icons.list_alt_outlined, 2),
     Task('Plan production', Icons.event_note_outlined, 4),
     Task('Trucks at the mill', Icons.local_shipping_outlined, 3),
     Task('Stock', Icons.inventory_2_outlined, 2),

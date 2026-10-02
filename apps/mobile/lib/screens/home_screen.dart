@@ -11,8 +11,8 @@ import 'dashboard_screen.dart';
 import 'deliveries_screen.dart';
 import 'dues_screen.dart';
 import 'loading_screen.dart';
-import 'my_orders_screen.dart';
 import 'new_order_screen.dart';
+import 'order_list_screen.dart';
 import 'production_screens.dart';
 import 'reports_screen.dart';
 import 'trucks_screen.dart';
@@ -279,6 +279,7 @@ Widget _screenFor(Task task, ErpNextClient client, S s, bool collect) =>
     switch (task.label) {
       'New order' => NewOrderScreen(client: client),
       'My orders' => MyOrdersScreen(client: client),
+      'All orders' => AllOrdersScreen(client: client),
       'Approve orders' => ApprovalsScreen(client: client),
       'Loading queue' => LoadingScreen(client: client),
       'Bills and payments' => TrucksScreen(client: client, mode: TruckMode.invoice),

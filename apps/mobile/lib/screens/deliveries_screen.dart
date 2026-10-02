@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
@@ -97,9 +98,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      t.customerName,
-                      style: Theme.of(context).textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            t.customerName,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        StageChip(t.stage, key: Key('stage-${t.id}')),
+                      ],
                     ),
                     Text(s.t('Vehicle {0}', [t.vehicleNo ?? '-'])),
                     const SizedBox(height: 8),

@@ -49,7 +49,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('sent')), findsOneWidget);
     expect(find.text('Gupta Traders'), findsOneWidget);
-    expect(find.text('Pending Approval'), findsOneWidget);
+    expect(find.text('Waiting for approval'), findsOneWidget);
   });
 
   testWidgets('quantity can be lowered and a line removed', (tester) async {
@@ -113,7 +113,7 @@ void main() {
     await tester.tap(find.text('My orders'));
     await tester.pumpAndSettle();
     expect(find.text('Sharma Kirana Store'), findsOneWidget);
-    expect(find.text('Pending Approval'), findsWidgets);
+    expect(find.text('Waiting for approval'), findsWidgets);
   });
 
   testWidgets('orders screens read in Hindi', (tester) async {
