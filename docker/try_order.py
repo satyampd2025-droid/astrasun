@@ -1,8 +1,9 @@
 """Tries the order the phone sends ("Send for approval") on this server and prints the server's own answer.
 
 Runs inside the backend container, from the sites folder, through docker/try-order.sh. It tries as the
-administrator and as each enabled user with the Mill Sales job (the wizard's own account holds it too).
-Nothing is saved: every try is rolled back, and commits are switched off for the whole run.
+administrator and as each enabled user who has a selling job (Mill Sales, Mill Manager or Mill Owner; the
+wizard's own account holds them all). Nothing is saved: every try is rolled back, and commits are switched
+off for the whole run.
 """
 
 import os
@@ -16,6 +17,8 @@ frappe.connect()
 frappe.db.commit = lambda *args, **kwargs: None  # whatever the code under test does, nothing is kept
 
 from astrasun import orders  # noqa: E402  (needs the site connection first)
+
+SELLING_JOBS = ["Mill Sales", "Mill Manager", "Mill Owner"]
 
 
 def say(line=""):
@@ -84,13 +87,15 @@ try:
 		say("Nothing to try: the phone needs at least one customer and one item in Item Group 'Finished Goods'.")
 	else:
 		show_facts(customer, item)
-		sales = frappe.get_all("Has Role", filters={"role": "Mill Sales", "parenttype": "User"}, pluck="parent")
+		sellers = frappe.get_all(
+			"Has Role", filters={"role": ["in", SELLING_JOBS], "parenttype": "User"}, pluck="parent"
+		)
 		users = ["Administrator"] + [
-			user for user in dict.fromkeys(sales)
+			user for user in dict.fromkeys(sellers)
 			if user != "Administrator" and frappe.db.get_value("User", user, "enabled")
 		]
 		say()
-		for user in users[:6]:
+		for user in users[:8]:
 			say(f"As {user}:")
 			say(f"  {attempt(user, customer, item)}")
 finally:
