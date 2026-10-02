@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Atulyaa mill - database (RDS MariaDB), two Redis, shared file storage (EFS) and the image registry (ECR)
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: mill
+    Description: Must match the network stack
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.small
+  DbStorageGb:
+    Type: Number
+    Default: 50
+    MinValue: 20
+  DbMultiAz:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: A standby copy in another zone. Roughly doubles the database price.
+  RedisNodeType:
+    Type: String
+    Default: cache.t4g.micro
+  DeletionProtection:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  ProtectDb: !Equals [!Ref DeletionProtection, "true"]
+
+Resources:
+  DataSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database, Redis and file storage, reachable only from inside the VPC
+      VpcId: { "Fn::ImportValue": !Sub "${EnvName}-VpcId" }
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 3306, ToPort: 3306, CidrIp: { "Fn::ImportValue": !Sub "${EnvName}-VpcCidr" } }
+        - { IpProtocol: tcp, FromPort: 6379, ToPort: 6379, CidrIp: { "Fn::ImportValue": !Sub "${EnvName}-VpcCidr" } }
+        - { IpProtocol: tcp, FromPort: 2049, ToPort: 2049, CidrIp: { "Fn::ImportValue": !Sub "${EnvName}-VpcCidr" } }
+      Tags:
+        - { Key: Name, Value: !Sub "${EnvName}-data" }
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvName}/db"
+      Description: Master login of the mill database
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: "\"@/\\'`$ "
+
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvName}/erpnext-admin"
+      Description: ERPNext Administrator password
+      GenerateSecretString:
+        PasswordLength: 20
+        ExcludePunctuation: true
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for the mill database
+      SubnetIds:
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetA" }
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetB" }
+
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: ERPNext needs utf8mb4
+      Family: mariadb10.11
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
+        character_set_client_handshake: "0"
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${EnvName}-db"
+      Engine: mariadb
+      EngineVersion: "10.11.10"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbStorageGb
+      MaxAllocatedStorage: 200
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: !Ref DbMultiAz
+      MasterUsername: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:username}}"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups: [!GetAtt DataSecurityGroup.GroupId]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 14
+      PreferredBackupWindow: "21:00-22:00"
+      DeletionProtection: !If [ProtectDb, true, false]
+      CopyTagsToSnapshot: true
+
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Private subnets for Redis
+      SubnetIds:
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetA" }
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetB" }
+
+  RedisCache:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupDescription: ERPNext cache
+      Engine: redis
+      EngineVersion: "7.0"
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheClusters: 1
+      AutomaticFailoverEnabled: false
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      SecurityGroupIds: [!GetAtt DataSecurityGroup.GroupId]
+      AtRestEncryptionEnabled: true
+
+  RedisQueue:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupDescription: ERPNext background job queue
+      Engine: redis
+      EngineVersion: "7.0"
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheClusters: 1
+      AutomaticFailoverEnabled: false
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      SecurityGroupIds: [!GetAtt DataSecurityGroup.GroupId]
+      AtRestEncryptionEnabled: true
+      SnapshotRetentionLimit: 3
+
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: elastic
+      BackupPolicy: { Status: ENABLED }
+      FileSystemTags:
+        - { Key: Name, Value: !Sub "${EnvName}-sites" }
+
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetA" }
+      SecurityGroups: [!GetAtt DataSecurityGroup.GroupId]
+
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetB" }
+      SecurityGroups: [!GetAtt DataSecurityGroup.GroupId]
+
+  SitesAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref FileSystem
+      PosixUser: { Uid: "1000", Gid: "1000" }
+      RootDirectory:
+        Path: /sites
+        CreationInfo: { OwnerUid: "1000", OwnerGid: "1000", Permissions: "0755" }
+
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${EnvName}/astrasun"
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep the last 15 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":15},"action":{"type":"expire"}}]}
+
+Outputs:
+  DbEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  DbSecretArn:
+    Value: !Ref DbSecret
+  AdminSecretArn:
+    Value: !Ref AdminSecret
+  RedisCacheEndpoint:
+    Value: !GetAtt RedisCache.PrimaryEndPoint.Address
+  RedisQueueEndpoint:
+    Value: !GetAtt RedisQueue.PrimaryEndPoint.Address
+  FileSystemId:
+    Value: !Ref FileSystem
+  SitesAccessPointId:
+    Value: !Ref SitesAccessPoint
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri

@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: astrasun
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: backend}
+  template:
+    metadata:
+      labels: {app: backend}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: backend
+          image: ${IMAGE}
+          command: ["bash","-c","exec gunicorn -b 0.0.0.0:8000 -w 4 -t 120 frappe.app:application --preload"]
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            tcpSocket: {port: 8000}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 250m, memory: 768Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: websocket
+  namespace: astrasun
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: websocket}
+  template:
+    metadata:
+      labels: {app: websocket}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: websocket
+          image: ${IMAGE}
+          command: ["node","/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+          ports:
+            - containerPort: 9000
+          readinessProbe:
+            tcpSocket: {port: 9000}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: astrasun
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: frontend}
+  template:
+    metadata:
+      labels: {app: frontend}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: frontend
+          image: ${IMAGE}
+          command: ["nginx-entrypoint.sh"]
+          ports:
+            - containerPort: 8080
+          env:
+            - {name: BACKEND, value: "backend:8000"}
+            - {name: SOCKETIO, value: "websocket:9000"}
+            - name: FRAPPE_SITE_NAME_HEADER
+              valueFrom: {configMapKeyRef: {name: astrasun-config, key: SITE_NAME}}
+            - {name: UPSTREAM_REAL_IP_ADDRESS, value: "10.0.0.0/8"}
+            - {name: UPSTREAM_REAL_IP_HEADER, value: "X-Forwarded-For"}
+            - {name: UPSTREAM_REAL_IP_RECURSIVE, value: "off"}
+            - {name: PROXY_READ_TIMEOUT, value: "120"}
+            - {name: CLIENT_MAX_BODY_SIZE, value: "50m"}
+          readinessProbe:
+            tcpSocket: {port: 8080}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-short
+  namespace: astrasun
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: queue-short}
+  template:
+    metadata:
+      labels: {app: queue-short}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: queue-short
+          image: ${IMAGE}
+          command: ["bench","worker","--queue","short,default"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-long
+  namespace: astrasun
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: queue-long}
+  template:
+    metadata:
+      labels: {app: queue-long}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: queue-long
+          image: ${IMAGE}
+          command: ["bench","worker","--queue","long,default,short"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler
+  namespace: astrasun
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: scheduler}
+  template:
+    metadata:
+      labels: {app: scheduler}
+    spec:
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: scheduler
+          image: ${IMAGE}
+          command: ["bench","schedule"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}

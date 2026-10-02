@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Atulyaa mill - EKS cluster, two worker nodes, and the add-ons needed for shared storage
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: mill
+    Description: Also the cluster name. Must match the network stack.
+  KubernetesVersion:
+    Type: String
+    Default: "1.31"
+  NodeInstanceType:
+    Type: String
+    Default: t3.large
+  NodeCount:
+    Type: Number
+    Default: 2
+    MinValue: 2
+  AdminRoleArn:
+    Type: String
+    Default: ""
+    Description: Optional IAM role or user ARN that should get cluster-admin (so you can run kubectl)
+
+Conditions:
+  HasAdmin: !Not [!Equals [!Ref AdminRoleArn, ""]]
+
+Resources:
+  ClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: eks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  Cluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref EnvName
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt ClusterRole.Arn
+      AccessConfig:
+        AuthenticationMode: API_AND_CONFIG_MAP
+        BootstrapClusterCreatorAdminPermissions: true
+      ResourcesVpcConfig:
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+        SubnetIds:
+          - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetA" }
+          - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetB" }
+          - !Select [0, !Split [",", { "Fn::ImportValue": !Sub "${EnvName}-PublicSubnets" }]]
+          - !Select [1, !Split [",", { "Fn::ImportValue": !Sub "${EnvName}-PublicSubnets" }]]
+
+  AdminAccess:
+    Type: AWS::EKS::AccessEntry
+    Condition: HasAdmin
+    Properties:
+      ClusterName: !Ref Cluster
+      PrincipalArn: !Ref AdminRoleArn
+      AccessPolicies:
+        - PolicyArn: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+          AccessScope: { Type: cluster }
+
+  NodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref Cluster
+      NodegroupName: !Sub "${EnvName}-workers"
+      NodeRole: !GetAtt NodeRole.Arn
+      InstanceTypes: [!Ref NodeInstanceType]
+      AmiType: AL2023_x86_64_STANDARD
+      DiskSize: 40
+      ScalingConfig:
+        MinSize: !Ref NodeCount
+        DesiredSize: !Ref NodeCount
+        MaxSize: 4
+      Subnets:
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetA" }
+        - { "Fn::ImportValue": !Sub "${EnvName}-PrivateSubnetB" }
+
+  OidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: !GetAtt Cluster.OpenIdConnectIssuerUrl
+      ClientIdList: [sts.amazonaws.com]
+
+  EfsCsiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: !Sub
+        - |
+          {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+          "Principal":{"Federated":"${Oidc}"},
+          "Action":"sts:AssumeRoleWithWebIdentity",
+          "Condition":{"StringEquals":{"${Issuer}:sub":"system:serviceaccount:kube-system:efs-csi-controller-sa"}}}]}
+        - Oidc: !Ref OidcProvider
+          Issuer: !Select [1, !Split ["https://", !GetAtt Cluster.OpenIdConnectIssuerUrl]]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy
+
+  AddonVpcCni:
+    Type: AWS::EKS::Addon
+    DependsOn: NodeGroup
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: vpc-cni
+      ResolveConflicts: OVERWRITE
+
+  AddonKubeProxy:
+    Type: AWS::EKS::Addon
+    DependsOn: NodeGroup
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: kube-proxy
+      ResolveConflicts: OVERWRITE
+
+  AddonCoreDns:
+    Type: AWS::EKS::Addon
+    DependsOn: NodeGroup
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: coredns
+      ResolveConflicts: OVERWRITE
+
+  AddonEfsCsi:
+    Type: AWS::EKS::Addon
+    DependsOn: NodeGroup
+    Properties:
+      ClusterName: !Ref Cluster
+      AddonName: aws-efs-csi-driver
+      ServiceAccountRoleArn: !GetAtt EfsCsiRole.Arn
+      ResolveConflicts: OVERWRITE
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+  ClusterEndpoint:
+    Value: !GetAtt Cluster.Endpoint
