@@ -1,0 +1,31 @@
+Reason for Change,बदलाव का कारण
+Reason required,कारण ज़रूरी है
+Please enter a reason: {0},कृपया कारण लिखें: {0}
+changed {0},{0} बदला
+stock adjustment,स्टॉक समायोजन
+cancelling {0},{0} रद्द करना
+Critical Change Log,ज़रूरी बदलाव लॉग
+Critical Change Log cannot be edited,ज़रूरी बदलाव लॉग बदला नहीं जा सकता
+Critical Change Log cannot be deleted,ज़रूरी बदलाव लॉग हटाया नहीं जा सकता
+Old Value,पुराना मान
+New Value,नया मान
+Reason,कारण
+Mill Owner,मिल मालिक
+Mill Manager,मिल मैनेजर
+Mill Sales,सेल्स
+Mill Purchase,खरीद
+Mill Gate,गेट / कांटा
+Mill QC,लैब / क्वालिटी
+Mill Production,मिल ऑपरेटर
+Mill Packing,पैकिंग
+Mill Warehouse,लोडिंग / गोदाम
+Mill Dispatch,डिस्पैच
+Mill Driver,ड्राइवर
+Mill Accounts,अकाउंट्स
+Mill Auditor,ऑडिटर
+Raw Wheat,कच्चा गेहूं
+QC Hold,लैब होल्ड
+Bulk Flour,खुला आटा
+By-products,उप-उत्पाद
+Finished Goods,तैयार माल
+Packaging Material,पैकिंग सामान

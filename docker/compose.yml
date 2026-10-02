@@ -1,0 +1,126 @@
+# Local and VPS stack: ERPNext + India Compliance + astrasun.
+# Based on frappe_docker's pwd.yml. See docker/README.md.
+x-app: &app
+  image: ${ASTRASUN_IMAGE:-astrasun:dev}
+  restart: unless-stopped
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+
+services:
+  db:
+    image: mariadb:10.6
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in docker/.env}
+    healthcheck:
+      test: mysqladmin ping -h localhost --password=$$MYSQL_ROOT_PASSWORD
+      interval: 5s
+      retries: 20
+    volumes:
+      - db-data:/var/lib/mysql
+
+  redis-cache:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+
+  redis-queue:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-queue-data:/data
+
+  configurator:
+    image: ${ASTRASUN_IMAGE:-astrasun:dev}
+    restart: "no"
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host db;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache redis://redis-cache:6379;
+        bench set-config -g redis_queue redis://redis-queue:6379;
+        bench set-config -g redis_socketio redis://redis-queue:6379;
+        bench set-config -gp socketio_port 9000;
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+    depends_on:
+      db:
+        condition: service_healthy
+
+  create-site:
+    image: ${ASTRASUN_IMAGE:-astrasun:dev}
+    restart: "no"
+    entrypoint: ["bash", "-c"]
+    command:
+      - >
+        wait-for-it -t 120 db:3306;
+        wait-for-it -t 120 redis-cache:6379;
+        wait-for-it -t 120 redis-queue:6379;
+        until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]]; do sleep 5; done;
+        [ -d sites/${SITE_NAME} ] || bench new-site ${SITE_NAME} --mariadb-user-host-login-scope='%'
+        --admin-password=${ADMIN_PASSWORD} --db-root-username=root --db-root-password=${DB_ROOT_PASSWORD}
+        --install-app erpnext --install-app india_compliance --install-app astrasun --set-default;
+        bench --site ${SITE_NAME} migrate;
+    environment:
+      SITE_NAME: ${SITE_NAME:-mill.localhost}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in docker/.env}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+      - logs:/home/frappe/frappe-bench/logs
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+
+  backend:
+    <<: *app
+
+  websocket:
+    <<: *app
+    command: ["node", "/home/frappe/frappe-bench/apps/frappe/socketio.js"]
+
+  frontend:
+    <<: *app
+    command: ["nginx-entrypoint.sh"]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME:-mill.localhost}
+      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 50m
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      - backend
+      - websocket
+
+  queue-short:
+    <<: *app
+    command: ["bench", "worker", "--queue", "short,default"]
+
+  queue-long:
+    <<: *app
+    command: ["bench", "worker", "--queue", "long,default,short"]
+
+  scheduler:
+    <<: *app
+    command: ["bench", "schedule"]
+
+volumes:
+  db-data:
+  redis-queue-data:
+  sites:
+  logs:

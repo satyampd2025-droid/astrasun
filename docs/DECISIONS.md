@@ -14,6 +14,7 @@ The older short [PRD.md](PRD.md) is kept for background only; where they differ,
 | D4 | 2026-09-28 | **ERPNext is the accounting system.** No separate Tally books. | Points 20, 25, 26: P&L and balance sheet come from ERPNext's own ledger, so there is no reconciliation with another system. The CA gets exports or read-only access. |
 | D5 | 2026-09-28 | **Invoice (with e-invoice IRN and e-way bill) is created before the truck leaves.** | Point 14 order status becomes: DRAFT → SUBMITTED → PENDING APPROVAL → APPROVED → WAREHOUSE NOTIFIED → LOADING → LOADED → **INVOICED → DISPATCHED** → DELIVERED. MVP acceptance steps 9 and 10 swap. |
 | D6 | 2026-09-28 | **Hindi, voice input and WhatsApp are in the MVP.** | Point 31 adds Hindi/English on every screen and voice for remarks and reasons. Point 29 notifications go to app push and WhatsApp, including the owner's evening summary and customer invoice/receipt messages. |
+| D7 | 2026-10-02 | **Build order:** foundation, then sell and get paid, then wheat in, then milling and packing, then owner view, then pilot. Phone screens are built with each module, not in one phase at the end. | Changes the Point 39 stage order: Commercial and Fulfillment come before Inventory and Manufacturing. Finished-goods stock starts from opening balances until packing is live. |
 
 ## Scope added to the MVP (gaps found in the PRD)
 

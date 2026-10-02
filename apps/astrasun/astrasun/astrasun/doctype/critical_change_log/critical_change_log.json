@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-10-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "reference_doctype",
+  "reference_name",
+  "action",
+  "column_break_1",
+  "user",
+  "timestamp",
+  "section_change",
+  "field_name",
+  "field_label",
+  "old_value",
+  "new_value",
+  "reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "reference_doctype",
+   "label": "Document Type",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "DocType",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "label": "Document",
+   "fieldtype": "Dynamic Link",
+   "read_only": 1,
+   "options": "reference_doctype",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "action",
+   "label": "Action",
+   "fieldtype": "Select",
+   "read_only": 1,
+   "options": "Update\nStock Adjustment\nCancel",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break",
+   "read_only": 0
+  },
+  {
+   "fieldname": "user",
+   "label": "User",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "timestamp",
+   "label": "Time",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_change",
+   "label": "Change",
+   "fieldtype": "Section Break",
+   "read_only": 0
+  },
+  {
+   "fieldname": "field_name",
+   "label": "Field",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "field_label",
+   "label": "Field Label",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "old_value",
+   "label": "Old Value",
+   "fieldtype": "Long Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_value",
+   "label": "New Value",
+   "fieldtype": "Long Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "label": "Reason",
+   "fieldtype": "Small Text",
+   "read_only": 1,
+   "reqd": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Astrasun",
+ "name": "Critical Change Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Mill Owner",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Mill Auditor",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Auditor",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "reference_name",
+ "track_changes": 0
+}
