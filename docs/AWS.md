@@ -26,3 +26,19 @@ EKS this way is about $250 to $300 a month (control plane, 2 nodes, NAT, RDS, Re
 - Redis here has no password or TLS, and is only reachable from inside the VPC.
 - The load balancer sends plain HTTP to nginx after TLS ends at the NLB.
 - Backups: RDS automated backups and a final snapshot on delete are on; EFS backup is on. Restore has not been rehearsed.
+
+## Two separate environments on one small server each (recommended)
+`infra/aws/single-server/server.yaml` is one self-contained environment. Deploy it twice (`./deploy.sh test ...` and `./deploy.sh prod ...`) and you get two copies that share nothing: own network and address range, own server, own fixed IP, own backup bucket, own generated admin password, own IAM role that can touch only its own bucket and secrets, own domain name.
+
+| | test | prod |
+|---|---|---|
+| Server | t3.small, about $15 a month, can be stopped when idle | t3.medium, about $35 to $40 a month |
+| Domain | e.g. mill-test.yourdomain | e.g. mill.yourdomain |
+| Data | demo or copied sample data only | real data |
+
+Notes
+- Separate stacks in one AWS account is separate resources. For the strongest wall (separate billing and access) use two AWS accounts and a different `AWS_PROFILE` per environment; the same files work. Your $100 credit belongs to one account.
+- The phone app for test must be built pointing at the test address, so test and prod APKs are different builds and a tester can never touch real data.
+- No SSH port is open; log in through AWS Systems Manager Session Manager.
+- The repository is private, so the server needs a read-only GitHub token stored in Secrets Manager (`GITHUB_TOKEN_SECRET_ARN`) until the code is moved to a public or deploy-key setup.
+- Offline checks only so far (cfn-lint passes); never run in a real account.
