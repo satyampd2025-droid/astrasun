@@ -221,7 +221,7 @@ Resources:
     Type: AWS::IAM::InstanceProfile
     Properties: { Roles: [!Ref ServerRole] }
 
-  Server:
+  AppServer:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
@@ -231,7 +231,7 @@ Resources:
       SecurityGroupIds: [!Ref Firewall]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
-          Ebs: { VolumeSize: !Ref DiskGb, VolumeType: gp3, Encrypted: true, DeleteOnTermination: false }
+          Ebs: { VolumeSize: !Ref DiskGb, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
       Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}" }]
       UserData:
         Fn::Base64: !Sub
@@ -239,7 +239,12 @@ Resources:
             #!/usr/bin/env bash
             set -euxo pipefail
             export DEBIAN_FRONTEND=noninteractive
-            apt-get update -y && apt-get install -y ca-certificates curl git ufw awscli jq
+            apt-get update -y && apt-get install -y ca-certificates curl git ufw jq unzip
+            # Ubuntu 24.04 has no awscli package: use AWS's own installer
+            if ! command -v aws >/dev/null; then
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+              unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws /tmp/awscliv2.zip
+            fi
             command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
             ufw allow 80 && ufw allow 443 && ufw --force enable
             REGION=${AWS::Region}
@@ -285,7 +290,7 @@ Resources:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
-      InstanceId: !Ref Server
+      InstanceId: !Ref AppServer
 
 Outputs:
   ServerAddress:
@@ -301,4 +306,4 @@ Outputs:
     Value: !Ref AdminSecret
   Login:
     Description: "Log in without SSH: AWS console, Systems Manager, Session Manager"
-    Value: !Ref Server
+    Value: !Ref AppServer
