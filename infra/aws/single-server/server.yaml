@@ -30,6 +30,11 @@ Parameters:
     Type: String
     Default: db.t4g.small
     Description: "Managed MariaDB (RDS) size. db.t4g.small is 2 GB."
+  DbBackupDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    Description: "Days of automatic database backups. The AWS Free plan allows only 1."
   DbStorageGb:
     Type: Number
     Default: 20
@@ -152,7 +157,7 @@ Resources:
       DBParameterGroupName: !Ref DbParameterGroup
       VPCSecurityGroups: [!GetAtt DbFirewall.GroupId]
       PubliclyAccessible: false
-      BackupRetentionPeriod: 7
+      BackupRetentionPeriod: !Ref DbBackupDays
       PreferredBackupWindow: "20:30-21:30"
       DeletionProtection: !If [IsProd, true, false]
       CopyTagsToSnapshot: true
