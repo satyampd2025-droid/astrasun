@@ -129,6 +129,7 @@ Resources:
       Parameters:
         character_set_server: utf8mb4
         collation_server: utf8mb4_unicode_ci
+        innodb_read_only_compressed: "0"
 
   # Managed MariaDB. The master password is generated and kept by RDS in Secrets Manager.
   Database:
