@@ -9,6 +9,8 @@ what the warehouse later loads against.
 
 Status lives in `astrasun_approval_status` on the Sales Order:
 Draft -> Pending Approval -> Approved | Rejected | Sent Back.
+Where an approved order stands after that (loading, on the way, paid) is worked
+out from its trucks and bills, see `stages.py`.
 """
 
 import json
@@ -17,7 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
 
-from astrasun import audit
+from astrasun import audit, stages
 
 APPROVER_ROLES = ("Mill Owner", "Mill Manager")
 OWNER_ROLE = "Mill Owner"
@@ -215,12 +217,79 @@ def _decide(name, status, reason):
 	return summary(doc)
 
 
-def summary(doc):
+def _facts(names):
+	"""For each order: the loading status of its trucks and what its bills add up to.
+
+	Four small queries for a whole list, not four per order.
+	"""
+	facts = {n: {"trucks": [], "billed": 0.0, "outstanding": 0.0} for n in names}
+	if not names:
+		return facts
+
+	notes = frappe.get_all(
+		"Delivery Note Item",
+		filters={"against_sales_order": ["in", names], "docstatus": ["<", 2]},
+		fields=["against_sales_order", "parent"],
+		distinct=True,
+	)
+	if notes:
+		status = {
+			dn.name: dn.astrasun_loading_status
+			for dn in frappe.get_all(
+				"Delivery Note",
+				filters={
+					"name": ["in", list({r.parent for r in notes})],
+					"docstatus": ["<", 2],
+					"astrasun_loading_status": ["is", "set"],
+				},
+				fields=["name", "astrasun_loading_status"],
+			)
+		}
+		for row in notes:
+			if row.parent in status:
+				facts[row.against_sales_order]["trucks"].append(status[row.parent])
+
+	lines = frappe.get_all(
+		"Sales Invoice Item",
+		filters={"sales_order": ["in", names], "docstatus": 1},
+		fields=["sales_order", "parent"],
+		distinct=True,
+	)
+	if lines:
+		bills = {
+			b.name: b
+			for b in frappe.get_all(
+				"Sales Invoice",
+				filters={"name": ["in", list({r.parent for r in lines})], "docstatus": 1, "is_return": 0},
+				fields=["name", "grand_total", "outstanding_amount"],
+			)
+		}
+		for row in lines:
+			if row.parent in bills:
+				facts[row.sales_order]["billed"] += flt(bills[row.parent].grand_total)
+				facts[row.sales_order]["outstanding"] += flt(bills[row.parent].outstanding_amount)
+	return facts
+
+
+def summary(doc, facts=None):
+	"""The order as the phone shows it. `facts` is `_facts` for a whole list, else fetched here."""
+	fact = (facts or _facts([doc.name]))[doc.name]
+	stage = stages.describe(
+		doc.astrasun_approval_status,
+		trucks=fact["trucks"],
+		fully_delivered=flt(doc.per_delivered) >= 100,
+		billed=fact["billed"],
+		outstanding=fact["outstanding"],
+		cancelled=doc.docstatus == 2,
+	)
 	return {
 		"name": doc.name,
 		"customer": doc.customer,
 		"customer_name": doc.customer_name,
 		"status": doc.astrasun_approval_status,
+		"stage": stage["stage"],
+		"tone": stage["tone"],
+		"timeline": stage["timeline"],
 		"total": flt(doc.grand_total),
 		"delivery_date": str(doc.delivery_date),
 		"submitted_by": doc.astrasun_submitted_by,
@@ -239,6 +308,11 @@ def summary(doc):
 	}
 
 
+def _summaries(names):
+	facts = _facts(names)
+	return [summary(frappe.get_doc("Sales Order", n), facts) for n in names]
+
+
 @frappe.whitelist()
 def my_orders(limit=30):
 	names = frappe.get_all(
@@ -249,7 +323,7 @@ def my_orders(limit=30):
 		limit=int(limit),
 		pluck="name",
 	)
-	return [summary(frappe.get_doc("Sales Order", n)) for n in names]
+	return _summaries(names)
 
 
 @frappe.whitelist()
@@ -262,7 +336,22 @@ def pending_approvals():
 		order_by="creation asc",
 		pluck="name",
 	)
-	return [summary(frappe.get_doc("Sales Order", n)) for n in names]
+	return _summaries(names)
+
+
+@frappe.whitelist()
+def all_orders(limit=50):
+	"""Every order that was sent in, newest first, with where it stands. Owner and managers."""
+	if not set(frappe.get_roles()).intersection(APPROVER_ROLES):
+		frappe.throw(_("Only the owner or a manager can see all orders"), frappe.PermissionError)
+	names = frappe.get_all(
+		"Sales Order",
+		filters={"astrasun_approval_status": ["!=", DRAFT]},
+		order_by="modified desc",
+		limit=min(int(limit), 200),
+		pluck="name",
+	)
+	return _summaries(names)
 
 
 @frappe.whitelist()
