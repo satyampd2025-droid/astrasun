@@ -1,5 +1,7 @@
 # Builds the phone app on every push and publishes the APK at one fixed link:
 # https://github.com/satyampd2025-droid/astrasun/releases/download/app-preview/atulyaa-mill.apk
+# A branch can point its build at a server with apps/mobile/build-target.env
+# (SERVER_URL=..., RELEASE_TAG=...); the test-server APK goes to the app-test release.
 name: Android preview APK
 
 on:
@@ -13,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: android-preview
+  group: android-preview-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -35,6 +37,14 @@ jobs:
           flutter-version: "3.35.5"
           channel: stable
           cache: true
+
+      - name: Pick server and release
+        run: |
+          SERVER_URL="${{ vars.MILL_SERVER_URL }}"; RELEASE_TAG=app-preview
+          [ -f build-target.env ] && . ./build-target.env
+          echo "SERVER_URL=$SERVER_URL" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "Building for ${SERVER_URL:-demo only}, release $RELEASE_TAG"
 
       - run: flutter pub get
       - run: flutter analyze
@@ -62,7 +72,7 @@ jobs:
         run: >
           flutter build apk --release
           --build-number=${{ github.run_number }}
-          --dart-define=SERVER_URL=${{ vars.MILL_SERVER_URL }}
+          --dart-define=SERVER_URL=$SERVER_URL
         env:
           PREVIEW_KEYSTORE_PASSWORD: atulyaa-preview
 
@@ -73,9 +83,10 @@ jobs:
         run: |
           cp apps/mobile/build/app/outputs/flutter-apk/app-release.apk atulyaa-mill.apk
           notes="Build ${{ github.run_number }} from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Install on Android: open the link, download, allow installs from this source."
-          if gh release view app-preview >/dev/null 2>&1; then
-            gh release upload app-preview atulyaa-mill.apk --clobber
-            gh release edit app-preview --notes "$notes"
+          notes="$notes Server: ${SERVER_URL:-none, demo only}."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" atulyaa-mill.apk --clobber
+            gh release edit "$RELEASE_TAG" --notes "$notes"
           else
-            gh release create app-preview atulyaa-mill.apk --prerelease --title "Phone app preview" --notes "$notes" --target "$GITHUB_SHA"
+            gh release create "$RELEASE_TAG" atulyaa-mill.apk --prerelease --title "Phone app ($RELEASE_TAG)" --notes "$notes" --target "$GITHUB_SHA"
           fi
