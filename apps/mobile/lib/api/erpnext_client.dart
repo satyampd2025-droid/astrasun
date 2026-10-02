@@ -328,6 +328,72 @@ class ErpNextClient {
     }),
   );
 
+  Future<double> wheatAvailable() async =>
+      (_message(await _post('astrasun.milling.wheat_available', {})) as num)
+          .toDouble();
+
+  Future<MillResult> recordBatch({
+    required String shift,
+    required double wheatKg,
+    required double waterKg,
+    required double attaKg,
+    required double maidaKg,
+    required double soojiKg,
+    required double chokarKg,
+  }) async {
+    final m =
+        _message(
+              await _post('astrasun.milling.record_batch', {
+                'shift': shift,
+                'wheat_kg': wheatKg,
+                'water_kg': waterKg,
+                'atta_kg': attaKg,
+                'maida_kg': maidaKg,
+                'sooji_kg': soojiKg,
+                'chokar_kg': chokarKg,
+              }),
+            )
+            as Map<String, dynamic>;
+    return MillResult(
+      extractionPct: (m['extraction_pct'] as num).toDouble(),
+      lossKg: (m['loss_kg'] as num).toDouble(),
+      lowYield: m['low_yield'] as bool,
+    );
+  }
+
+  Future<void> reportDowntime(
+    String machine,
+    int minutes,
+    String reason,
+  ) async {
+    _message(
+      await _post('astrasun.milling.report_downtime', {
+        'machine': machine,
+        'minutes': minutes,
+        'reason': reason,
+      }),
+    );
+  }
+
+  Future<List<PackSku>> packSkus() async => [
+    for (final j in _message(await _post('astrasun.packing.skus', {})) as List)
+      PackSku.fromJson(j as Map<String, dynamic>),
+  ];
+
+  Future<void> pack(PackSku sku, int bags) async {
+    _message(
+      await _post('astrasun.packing.pack', {
+        'item_code': sku.code,
+        'bags': bags,
+      }),
+    );
+  }
+
+  Future<List<StockRow>> stock() async => [
+    for (final j in _message(await _post('astrasun.packing.stock', {})) as List)
+      StockRow.fromJson(j as Map<String, dynamic>),
+  ];
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }

@@ -12,6 +12,7 @@ import 'dues_screen.dart';
 import 'loading_screen.dart';
 import 'my_orders_screen.dart';
 import 'new_order_screen.dart';
+import 'production_screens.dart';
 import 'trucks_screen.dart';
 import 'wheat_screens.dart';
 
@@ -87,6 +88,10 @@ Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
   'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),
   'Weighbridge' => WeighbridgeScreen(client: client),
   'Check wheat lot' => LabScreen(client: client),
+  'Start milling batch' => MillingScreen(client: client),
+  'Report downtime' => DowntimeScreen(client: client),
+  'Pack bags' => PackScreen(client: client),
+  'Stock' => StockScreen(client: client),
   _ => ComingSoonScreen(title: s.t(task.label)),
 };
 

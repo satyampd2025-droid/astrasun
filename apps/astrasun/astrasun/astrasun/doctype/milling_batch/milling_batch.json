@@ -1,0 +1,231 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "MB-.YY.-.####",
+ "creation": "2026-10-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "shift",
+  "company",
+  "column_break_1",
+  "run_at",
+  "run_by",
+  "section_in",
+  "wheat_kg",
+  "water_kg",
+  "section_out",
+  "atta_kg",
+  "maida_kg",
+  "sooji_kg",
+  "chokar_kg",
+  "column_break_2",
+  "output_kg",
+  "flour_kg",
+  "loss_kg",
+  "extraction_pct",
+  "loss_pct",
+  "low_yield",
+  "section_stock",
+  "stock_entry"
+ ],
+ "fields": [
+  {
+   "fieldname": "shift",
+   "label": "Shift",
+   "fieldtype": "Select",
+   "options": "Morning\nAfternoon\nNight",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "run_at",
+   "label": "Run At",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "run_by",
+   "label": "Run By",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_in",
+   "label": "Wheat In",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "wheat_kg",
+   "label": "Wheat Ground (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "water_kg",
+   "label": "Tempering Water (kg)",
+   "fieldtype": "Float"
+  },
+  {
+   "fieldname": "section_out",
+   "label": "Output",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "atta_kg",
+   "label": "Atta (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "maida_kg",
+   "label": "Maida (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sooji_kg",
+   "label": "Sooji (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "chokar_kg",
+   "label": "Chokar (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "output_kg",
+   "label": "Total Output (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "flour_kg",
+   "label": "Flour (atta + maida + sooji) (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "loss_kg",
+   "label": "Process Loss (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "extraction_pct",
+   "label": "Extraction % (flour from wheat)",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "loss_pct",
+   "label": "Loss %",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "low_yield",
+   "label": "Low Yield",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_stock",
+   "label": "Stock",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "stock_entry",
+   "label": "Stock Entry",
+   "fieldtype": "Link",
+   "options": "Stock Entry",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Astrasun",
+ "name": "Milling Batch",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Mill Production",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Owner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Auditor",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "shift",
+ "track_changes": 1
+}

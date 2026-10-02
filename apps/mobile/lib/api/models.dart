@@ -292,3 +292,82 @@ class WheatTruck {
     broken: broken ?? this.broken,
   );
 }
+
+/// What one milling shift gave: flour from wheat, and whether it needs a look.
+class MillResult {
+  const MillResult({
+    required this.extractionPct,
+    required this.lossKg,
+    required this.lowYield,
+  });
+  final double extractionPct;
+  final double lossKg;
+  final bool lowYield;
+}
+
+/// A packable bag size with the bulk flour and empty bags on hand.
+class PackSku {
+  const PackSku({
+    required this.code,
+    required this.name,
+    required this.kg,
+    required this.bulkKg,
+    required this.emptyBags,
+    required this.packedBags,
+  });
+
+  factory PackSku.fromJson(Map<String, dynamic> j) => PackSku(
+    code: j['item_code'] as String,
+    name: j['item_name'] as String,
+    kg: (j['kg'] as num).toDouble(),
+    bulkKg: (j['bulk_kg'] as num).toDouble(),
+    emptyBags: (j['empty_bags'] as num).toDouble(),
+    packedBags: (j['packed_bags'] as num).toDouble(),
+  );
+
+  final String code;
+  final String name;
+  final double kg;
+  final double bulkKg;
+  final double emptyBags;
+  final double packedBags;
+
+  /// Most bags that bulk flour and empty bags allow.
+  int get canPack {
+    final byFlour = (bulkKg / kg).floor();
+    final byBags = emptyBags.floor();
+    return byFlour < byBags ? byFlour : byBags;
+  }
+
+  PackSku after(int bags) => PackSku(
+    code: code,
+    name: name,
+    kg: kg,
+    bulkKg: bulkKg - bags * kg,
+    emptyBags: emptyBags - bags,
+    packedBags: packedBags + bags,
+  );
+}
+
+/// One line of the stock view.
+class StockRow {
+  const StockRow(this.code, this.name, this.qty, this.unit, this.kind);
+
+  factory StockRow.fromJson(Map<String, dynamic> j) => StockRow(
+    j['item_code'] as String,
+    j['item_name'] as String,
+    (j['qty'] as num).toDouble(),
+    j['unit'] as String,
+    j['kind'] as String,
+  );
+
+  final String code;
+  final String name;
+  final double qty;
+
+  /// kg or bags.
+  final String unit;
+
+  /// Raw, Bulk or Packed.
+  final String kind;
+}

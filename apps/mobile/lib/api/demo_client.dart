@@ -415,6 +415,125 @@ class DemoClient extends ErpNextClient {
     );
   }
 
+  double _wheatStock = 85000;
+  final Map<String, double> _bulk = {
+    'ATTA-BULK': 12000,
+    'MAIDA-BULK': 2500,
+    'SOOJI-BULK': 800,
+    'CHOKAR-BULK': 3000,
+  };
+
+  @override
+  Future<double> wheatAvailable() async => _wheatStock;
+
+  @override
+  Future<MillResult> recordBatch({
+    required String shift,
+    required double wheatKg,
+    required double waterKg,
+    required double attaKg,
+    required double maidaKg,
+    required double soojiKg,
+    required double chokarKg,
+  }) async {
+    final out = attaKg + maidaKg + soojiKg + chokarKg;
+    if (wheatKg <= 0 || out <= 0 || out > wheatKg * 1.05) {
+      throw Exception('numbers');
+    }
+    if (wheatKg > _wheatStock) throw Exception('stock');
+    _wheatStock -= wheatKg;
+    _bulk['ATTA-BULK'] = _bulk['ATTA-BULK']! + attaKg;
+    _bulk['MAIDA-BULK'] = _bulk['MAIDA-BULK']! + maidaKg;
+    _bulk['SOOJI-BULK'] = _bulk['SOOJI-BULK']! + soojiKg;
+    _bulk['CHOKAR-BULK'] = _bulk['CHOKAR-BULK']! + chokarKg;
+    final flour = attaKg + maidaKg + soojiKg;
+    final loss = wheatKg > out ? wheatKg - out : 0.0;
+    final extraction = flour / wheatKg * 100;
+    return MillResult(
+      extractionPct: extraction,
+      lossKg: loss,
+      lowYield: extraction < 78 || loss / wheatKg * 100 > 2,
+    );
+  }
+
+  final List<String> downtimes = [];
+
+  @override
+  Future<void> reportDowntime(
+    String machine,
+    int minutes,
+    String reason,
+  ) async {
+    if (machine.trim().isEmpty || minutes <= 0 || reason.trim().isEmpty) {
+      throw Exception('downtime');
+    }
+    downtimes.add('$machine $minutes');
+  }
+
+  final Map<String, PackSku> _skus = {
+    'ATTA-10KG': const PackSku(
+      code: 'ATTA-10KG',
+      name: 'Atta 10 kg',
+      kg: 10,
+      bulkKg: 0,
+      emptyBags: 600,
+      packedBags: 120,
+    ),
+    'ATTA-50KG': const PackSku(
+      code: 'ATTA-50KG',
+      name: 'Atta 50 kg',
+      kg: 50,
+      bulkKg: 0,
+      emptyBags: 300,
+      packedBags: 80,
+    ),
+  };
+
+  @override
+  Future<List<PackSku>> packSkus() async => [
+    for (final s in _skus.values)
+      PackSku(
+        code: s.code,
+        name: s.name,
+        kg: s.kg,
+        bulkKg: _bulk['ATTA-BULK']!,
+        emptyBags: s.emptyBags,
+        packedBags: s.packedBags,
+      ),
+  ];
+
+  @override
+  Future<void> pack(PackSku sku, int bags) async {
+    final s = _skus[sku.code]!;
+    if (bags <= 0 || bags > sku.canPack) throw Exception('pack');
+    _bulk['ATTA-BULK'] = _bulk['ATTA-BULK']! - bags * s.kg;
+    _skus[sku.code] = PackSku(
+      code: s.code,
+      name: s.name,
+      kg: s.kg,
+      bulkKg: 0,
+      emptyBags: s.emptyBags - bags,
+      packedBags: s.packedBags + bags,
+    );
+  }
+
+  @override
+  Future<List<StockRow>> stock() async => [
+    StockRow('WHEAT', 'Wheat', _wheatStock, 'kg', 'Raw'),
+    StockRow('ATTA-BULK', 'Atta (bulk)', _bulk['ATTA-BULK']!, 'kg', 'Bulk'),
+    StockRow('MAIDA-BULK', 'Maida (bulk)', _bulk['MAIDA-BULK']!, 'kg', 'Bulk'),
+    StockRow('SOOJI-BULK', 'Sooji (bulk)', _bulk['SOOJI-BULK']!, 'kg', 'Bulk'),
+    StockRow(
+      'CHOKAR-BULK',
+      'Chokar (bulk)',
+      _bulk['CHOKAR-BULK']!,
+      'kg',
+      'Bulk',
+    ),
+    for (final s in _skus.values)
+      StockRow(s.code, s.name, s.packedBags, 'bags', 'Packed'),
+  ];
+
   @override
   Future<Order> sendBack(String name, String reason) async =>
       _set(name, 'Sent Back', reason);
