@@ -105,7 +105,7 @@ void main() {
     await logIn(tester);
     expect(find.text('New order'), findsOneWidget);
     expect(find.text('Customer dues'), findsOneWidget);
-    await tester.tap(find.text('New order'));
+    await tester.tap(find.text('Customer dues'));
     await tester.pumpAndSettle();
     expect(find.text('Coming soon'), findsOneWidget);
     expect(find.byKey(const Key('mic')), findsOneWidget);

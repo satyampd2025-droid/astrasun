@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../api/erpnext_client.dart';
 import '../app_state.dart';
 import '../home/role_tasks.dart';
 import '../strings.dart';
 import '../widgets/language_switch.dart';
+import 'approvals_screen.dart';
 import 'coming_soon_screen.dart';
+import 'my_orders_screen.dart';
+import 'new_order_screen.dart';
 
 /// "What I need to do now": big buttons for the user's mill roles.
 class HomeScreen extends StatelessWidget {
@@ -56,7 +60,7 @@ class HomeScreen extends StatelessWidget {
             for (final task in tasks)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _TaskButton(task: task),
+                child: _TaskButton(task: task, client: state.client!),
               ),
           ],
         ),
@@ -65,9 +69,18 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+/// The real screen for a task once it is built, else "coming soon".
+Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
+  'New order' => NewOrderScreen(client: client),
+  'My orders' => MyOrdersScreen(client: client),
+  'Approve orders' => ApprovalsScreen(client: client),
+  _ => ComingSoonScreen(title: s.t(task.label)),
+};
+
 class _TaskButton extends StatelessWidget {
-  const _TaskButton({required this.task});
+  const _TaskButton({required this.task, required this.client});
   final Task task;
+  final ErpNextClient client;
 
   @override
   Widget build(BuildContext context) {
@@ -78,11 +91,9 @@ class _TaskButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ComingSoonScreen(title: s.t(task.label)),
-          ),
-        ),
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => _screenFor(task, client, s))),
         child: Container(
           height: 88,
           padding: const EdgeInsets.symmetric(horizontal: 20),

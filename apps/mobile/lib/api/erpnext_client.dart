@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+import 'models.dart';
+
 class LoginFailed implements Exception {}
 
 class ServerUnreachable implements Exception {}
@@ -76,6 +78,81 @@ class ErpNextClient {
     if (res.statusCode != 200) throw ServerUnreachable();
     return Me.fromJson(jsonDecode(res.body)['message'] as Map<String, dynamic>);
   }
+
+  dynamic _message(http.Response res) {
+    if (res.statusCode == 403) throw LoginFailed();
+    if (res.statusCode != 200) throw ServerUnreachable();
+    return jsonDecode(res.body)['message'];
+  }
+
+  Future<Catalog> catalog() async {
+    final m = _message(await _post('astrasun.orders.catalog', {}));
+    return Catalog(
+      customers: [
+        for (final c in m['customers'] as List)
+          Customer(c['name'] as String, c['customer_name'] as String),
+      ],
+      items: [
+        for (final i in m['items'] as List)
+          CatalogItem(
+            i['item_code'] as String,
+            i['item_name'] as String,
+            (i['rate'] as num).toDouble(),
+          ),
+      ],
+    );
+  }
+
+  Future<Order> createOrder(
+    Customer customer,
+    List<OrderLine> lines,
+    String remarks,
+  ) async {
+    final res = await _post('astrasun.orders.create_order', {
+      'customer': customer.name,
+      'items': [
+        for (final l in lines)
+          {'item_code': l.item.code, 'qty': l.qty, 'rate': l.rate},
+      ],
+      'remarks': remarks,
+    });
+    return Order.fromJson(_message(res) as Map<String, dynamic>);
+  }
+
+  Future<List<Order>> myOrders() async =>
+      _orders(_message(await _post('astrasun.orders.my_orders', {})));
+
+  Future<List<Order>> pendingApprovals() async =>
+      _orders(_message(await _post('astrasun.orders.pending_approvals', {})));
+
+  List<Order> _orders(dynamic list) => [
+    for (final o in list as List) Order.fromJson(o as Map<String, dynamic>),
+  ];
+
+  Future<Order> approve(String name) async => Order.fromJson(
+    _message(await _post('astrasun.orders.approve', {'name': name}))
+        as Map<String, dynamic>,
+  );
+
+  Future<Order> reject(String name, String reason) async => Order.fromJson(
+    _message(
+          await _post('astrasun.orders.reject', {
+            'name': name,
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<Order> sendBack(String name, String reason) async => Order.fromJson(
+    _message(
+          await _post('astrasun.orders.send_back', {
+            'name': name,
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
 
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});

@@ -7,6 +7,8 @@ is missing.
 
 import frappe
 
+CUSTOMER_GROUPS = ["Retailer", "Distributor", "Bulk Buyer"]
+
 ITEM_GROUPS = ["Wheat", "Bulk Flour", "Finished Goods", "By-products", "Packaging"]
 
 # warehouse name -> what it holds
@@ -53,6 +55,7 @@ def setup_mill(company):
 	abbr = frappe.get_cached_value("Company", company, "abbr")
 	setup_uoms()
 	setup_item_groups()
+	setup_customer_groups()
 	warehouses = setup_warehouses(company, abbr)
 	setup_items(company, warehouses)
 	setup_boms(company)
@@ -89,6 +92,15 @@ def setup_item_groups():
 		if not frappe.db.exists("Item Group", group):
 			frappe.get_doc(
 				{"doctype": "Item Group", "item_group_name": group, "parent_item_group": root}
+			).insert(ignore_permissions=True)
+
+
+def setup_customer_groups():
+	root = frappe.db.get_value("Customer Group", {"is_group": 1, "parent_customer_group": ["in", ["", None]]})
+	for group in CUSTOMER_GROUPS:
+		if not frappe.db.exists("Customer Group", group):
+			frappe.get_doc(
+				{"doctype": "Customer Group", "customer_group_name": group, "parent_customer_group": root}
 			).insert(ignore_permissions=True)
 
 

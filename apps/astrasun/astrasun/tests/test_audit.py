@@ -83,6 +83,7 @@ class TestAudit(FrappeTestCase):
 				"doctype": "Customer",
 				"customer_name": frappe.generate_hash(length=8),
 				"customer_type": "Company",
+				"customer_group": "Retailer",
 			}
 		).insert()
 		customer.reload()
