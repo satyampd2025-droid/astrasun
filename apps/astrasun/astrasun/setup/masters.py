@@ -56,10 +56,36 @@ def setup_mill(company):
 	setup_uoms()
 	setup_item_groups()
 	setup_customer_groups()
+	setup_bank_account(company, abbr)
 	warehouses = setup_warehouses(company, abbr)
 	setup_items(company, warehouses)
 	setup_boms(company)
 	frappe.db.commit()
+
+
+def setup_bank_account(company, abbr):
+	"""A ledger for bank receipts (UTR / cheque); cash already has one."""
+	name = f"Mill Bank - {abbr}"
+	parent = f"Bank Accounts - {abbr}"
+	if not frappe.db.exists("Account", name) and frappe.db.exists("Account", parent):
+		frappe.get_doc(
+			{
+				"doctype": "Account",
+				"account_name": "Mill Bank",
+				"parent_account": parent,
+				"company": company,
+				"account_type": "Bank",
+				"is_group": 0,
+			}
+		).insert(ignore_permissions=True)
+	if not frappe.db.exists("Mode of Payment", "Bank"):
+		frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": "Bank", "type": "Bank"}).insert(
+			ignore_permissions=True
+		)
+	if frappe.db.exists("Account", name) and not frappe.db.get_value(
+		"Company", company, "default_bank_account"
+	):
+		frappe.db.set_value("Company", company, "default_bank_account", name)
 
 
 def setup_uoms():

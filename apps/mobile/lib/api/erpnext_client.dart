@@ -221,6 +221,52 @@ class ErpNextClient {
             as Map<String, dynamic>,
       );
 
+  Future<List<LoadingTask>> myDeliveries() async =>
+      _trucks(_message(await _post('astrasun.delivery.my_deliveries', {})));
+
+  Future<LoadingTask> deliver(
+    LoadingTask task,
+    String receivedBy,
+    String remarks,
+  ) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.delivery.deliver', {
+            'name': task.id,
+            'received_by': receivedBy,
+            'remarks': remarks,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<List<Due>> dues() async => [
+    for (final d in _message(await _post('astrasun.payments.dues', {})) as List)
+      Due.fromJson(d as Map<String, dynamic>),
+  ];
+
+  /// Money is matched to the customer's oldest bills first on the server.
+  Future<Collected> collect(
+    Due due,
+    double amount,
+    String mode,
+    String reference,
+  ) async {
+    final m =
+        _message(
+              await _post('astrasun.payments.collect', {
+                'customer': due.customer,
+                'amount': amount,
+                'mode': mode,
+                'reference': reference,
+              }),
+            )
+            as Map<String, dynamic>;
+    return Collected(
+      (m['amount'] as num).toDouble(),
+      (m['still_due'] as num).toDouble(),
+    );
+  }
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }

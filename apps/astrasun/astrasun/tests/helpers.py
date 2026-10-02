@@ -23,7 +23,7 @@ def _user(email, profile):
 class MillFixture(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.company = frappe.get_all("Company", pluck="name")[0]
+		self.company = frappe.db.get_value("Item Default", {"parent": ITEM}, "company")
 		self.abbr = frappe.get_cached_value("Company", self.company, "abbr")
 		self._open_fiscal_year()
 		self.rep = _user("rep@example.com", "Mill Sales")
@@ -80,3 +80,23 @@ class MillFixture(FrappeTestCase):
 	def _order(self, customer, qty=10, rate=1500, send=1):
 		frappe.set_user(self.rep)
 		return orders.create_order(customer, [{"item_code": ITEM, "qty": qty, "rate": rate}], send=send)
+
+	def make_dispatched(self, qty=10, customer=None):
+		"""Order approved, loaded, invoiced and sent out. Returns (customer, delivery note, invoice)."""
+		from astrasun import invoicing, loading
+
+		customer = customer or self._customer(limit=10000000)
+		loader = _user("loader@example.com", "Mill Warehouse")
+		accounts = _user("accounts@example.com", "Mill Accounts")
+		dispatcher = _user("dispatch@example.com", "Mill Dispatch")
+		order = self._order(customer, qty=qty)
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(loader)
+		task = loading.start(order["name"])
+		loading.mark_loaded(task["name"], "MP09AB1234", [{"item_code": ITEM, "qty": qty}])
+		frappe.set_user(accounts)
+		view = invoicing.invoice(task["name"], "271000123456")
+		frappe.set_user(dispatcher)
+		invoicing.dispatch(task["name"])
+		return customer, task["name"], view["invoice"]

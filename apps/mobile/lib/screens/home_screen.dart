@@ -7,6 +7,8 @@ import '../strings.dart';
 import '../widgets/language_switch.dart';
 import 'approvals_screen.dart';
 import 'coming_soon_screen.dart';
+import 'deliveries_screen.dart';
+import 'dues_screen.dart';
 import 'loading_screen.dart';
 import 'my_orders_screen.dart';
 import 'new_order_screen.dart';
@@ -79,6 +81,8 @@ Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
   'Loading queue' => LoadingScreen(client: client),
   'Bills and payments' => TrucksScreen(client: client, mode: TruckMode.invoice),
   'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
+  'My deliveries' => DeliveriesScreen(client: client),
+  'Collect payment' || 'Customer dues' => DuesScreen(client: client),
   _ => ComingSoonScreen(title: s.t(task.label)),
 };
 

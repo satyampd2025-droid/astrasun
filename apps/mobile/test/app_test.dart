@@ -98,14 +98,13 @@ void main() {
     expect(find.text('नया ऑर्डर'), findsNothing);
   });
 
-  testWidgets('sales rep sees order tasks and can open one', (tester) async {
-    await startApp(tester, ['Mill Sales']);
+  testWidgets('purchase sees tasks and can open one', (tester) async {
+    await startApp(tester, ['Mill Purchase']);
     await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
     await logIn(tester);
-    expect(find.text('New order'), findsOneWidget);
-    expect(find.text('Customer dues'), findsOneWidget);
-    await tester.tap(find.text('Customer dues'));
+    expect(find.text('Wheat purchase'), findsOneWidget);
+    await tester.tap(find.text('Wheat purchase'));
     await tester.pumpAndSettle();
     expect(find.text('Coming soon'), findsOneWidget);
     expect(find.byKey(const Key('mic')), findsOneWidget);

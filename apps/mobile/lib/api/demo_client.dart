@@ -247,6 +247,67 @@ class DemoClient extends ErpNextClient {
       _setTask(task.id, (t) => t.copyWith(status: 'Dispatched'));
 
   @override
+  Future<List<LoadingTask>> myDeliveries() async => [
+    for (final t in _loading)
+      if (t.status == 'Dispatched') t,
+  ];
+
+  @override
+  Future<LoadingTask> deliver(
+    LoadingTask task,
+    String receivedBy,
+    String remarks,
+  ) async {
+    if (receivedBy.trim().isEmpty) throw Exception('receiver');
+    return _setTask(task.id, (t) => t.copyWith(status: 'Delivered'));
+  }
+
+  final List<Due> _dues = [
+    const Due(
+      customer: 'verma',
+      customerName: 'Verma Distributors',
+      due: 60000,
+      bills: 2,
+      oldest: '2026-09-12',
+    ),
+    const Due(
+      customer: 'sharma',
+      customerName: 'Sharma Kirana Store',
+      due: 12000,
+      bills: 1,
+      oldest: '2026-09-25',
+    ),
+  ];
+
+  @override
+  Future<List<Due>> dues() async => List.of(_dues);
+
+  @override
+  Future<Collected> collect(
+    Due due,
+    double amount,
+    String mode,
+    String reference,
+  ) async {
+    if (amount <= 0 || amount > due.due) throw Exception('amount');
+    if (mode == 'Bank' && reference.trim().isEmpty) throw Exception('utr');
+    final i = _dues.indexWhere((d) => d.customer == due.customer);
+    final left = due.due - amount;
+    if (left <= 0) {
+      _dues.removeAt(i);
+    } else {
+      _dues[i] = Due(
+        customer: due.customer,
+        customerName: due.customerName,
+        due: left,
+        bills: due.bills,
+        oldest: due.oldest,
+      );
+    }
+    return Collected(amount, left);
+  }
+
+  @override
   Future<Order> sendBack(String name, String reason) async =>
       _set(name, 'Sent Back', reason);
 

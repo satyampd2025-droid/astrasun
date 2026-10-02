@@ -183,3 +183,40 @@ class LoadingTask {
     ewayBillNo: ewayBillNo ?? this.ewayBillNo,
   );
 }
+
+/// A customer who owes money, with the number of open bills.
+class Due {
+  const Due({
+    required this.customer,
+    required this.customerName,
+    required this.due,
+    required this.bills,
+    this.oldest,
+  });
+
+  factory Due.fromJson(Map<String, dynamic> j) {
+    final invoices = j['invoices'] as List;
+    return Due(
+      customer: j['customer'] as String,
+      customerName: (j['customer_name'] ?? j['customer']) as String,
+      due: (j['due'] as num).toDouble(),
+      bills: invoices.length,
+      oldest: invoices.isEmpty ? null : invoices.first['date'] as String,
+    );
+  }
+
+  final String customer;
+  final String customerName;
+  final double due;
+  final int bills;
+
+  /// Date of the oldest unpaid bill.
+  final String? oldest;
+}
+
+/// What a payment collection did.
+class Collected {
+  const Collected(this.amount, this.stillDue);
+  final double amount;
+  final double stillDue;
+}
