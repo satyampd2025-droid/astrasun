@@ -70,6 +70,17 @@ def _stock_short(doc):
 	return short
 
 
+def _below_price(doc):
+	"""True if any line is sold under the item's list price (placeholder minimum, see DECISIONS)."""
+	for row in doc.items:
+		listed = frappe.db.get_value(
+			"Item Price", {"item_code": row.item_code, "selling": 1}, "price_list_rate"
+		)
+		if listed and flt(row.rate) < flt(listed):
+			return True
+	return False
+
+
 def _check(doc):
 	"""Fill in the credit and stock facts the approver sees."""
 	outstanding, limit, exposure = _credit(doc.customer, doc.company, doc.grand_total)
@@ -79,6 +90,7 @@ def _check(doc):
 	# A limit of 0 means no limit has been set for this customer
 	doc.astrasun_credit_breach = int(bool(limit) and exposure > limit)
 	doc.astrasun_stock_short = int(bool(_stock_short(doc)))
+	doc.astrasun_below_price = int(_below_price(doc))
 
 
 def _warehouse(item_code, company):
@@ -214,6 +226,7 @@ def summary(doc):
 		"credit_exposure": flt(doc.astrasun_credit_exposure),
 		"credit_breach": bool(doc.astrasun_credit_breach),
 		"stock_short": bool(doc.astrasun_stock_short),
+		"below_min_price": bool(doc.astrasun_below_price),
 		"items": [
 			{"item_code": r.item_code, "item_name": r.item_name, "qty": flt(r.qty), "rate": flt(r.rate)}
 			for r in doc.items

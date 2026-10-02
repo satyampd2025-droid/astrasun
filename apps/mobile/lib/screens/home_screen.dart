@@ -14,6 +14,7 @@ import 'loading_screen.dart';
 import 'my_orders_screen.dart';
 import 'new_order_screen.dart';
 import 'production_screens.dart';
+import 'reports_screen.dart';
 import 'trucks_screen.dart';
 import 'wheat_screens.dart';
 
@@ -95,6 +96,7 @@ Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
   'Stock' => StockScreen(client: client),
   'Today at the mill' => DashboardScreen(client: client),
   'Alerts' => AlertsScreen(client: client),
+  'Reports' => ReportsScreen(client: client),
   _ => ComingSoonScreen(title: s.t(task.label)),
 };
 

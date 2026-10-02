@@ -399,6 +399,16 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
+  Future<Pnl> profitAndLoss() async => Pnl.fromJson(
+    _message(await _post('astrasun.reports.profit_and_loss', {}))
+        as Map<String, dynamic>,
+  );
+
+  Future<StockReport> stockStatement() async => StockReport.fromJson(
+    _message(await _post('astrasun.reports.stock_statement', {}))
+        as Map<String, dynamic>,
+  );
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }

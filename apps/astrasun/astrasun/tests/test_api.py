@@ -6,7 +6,7 @@ from astrasun.api import me, set_language
 
 class TestApi(FrappeTestCase):
 	def setUp(self):
-		email = "loader@example.com"
+		email = "ramesh.loader@example.com"
 		if not frappe.db.exists("User", email):
 			frappe.get_doc(
 				{

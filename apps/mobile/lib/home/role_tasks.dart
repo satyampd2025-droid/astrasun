@@ -16,6 +16,7 @@ const Map<String, List<Task>> roleTasks = {
     Task('Today at the mill', Icons.dashboard_outlined, 5),
     Task('Customer dues', Icons.account_balance_wallet_outlined, 2),
     Task('Alerts', Icons.notifications_active_outlined, 5),
+    Task('Reports', Icons.bar_chart, 5),
   ],
   'Mill Manager': [
     Task('Plan production', Icons.event_note_outlined, 4),

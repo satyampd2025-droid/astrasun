@@ -79,6 +79,12 @@ class OrderCard extends StatelessWidget {
                     const Color(0xFFB23A30),
                     key: const Key('credit-chip'),
                   ),
+                if (order.belowPrice)
+                  _Chip(
+                    s.t('Below list price'),
+                    const Color(0xFF9A6A00),
+                    key: const Key('price-chip'),
+                  ),
                 if (order.stockShort)
                   _Chip(
                     s.t('Stock is short'),

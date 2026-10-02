@@ -98,12 +98,21 @@ FIELDS = [
 		"insert_after": "astrasun_credit_breach",
 	},
 	{
+		"fieldname": "astrasun_below_price",
+		"label": "Below Minimum Price",
+		"fieldtype": "Check",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_stock_short",
+	},
+	{
 		"fieldname": "astrasun_remarks",
 		"label": "Remarks",
 		"fieldtype": "Small Text",
 		"no_copy": 1,
 		"allow_on_submit": 1,
-		"insert_after": "astrasun_stock_short",
+		"insert_after": "astrasun_below_price",
 	},
 ]
 

@@ -33,6 +33,7 @@ class Order {
     this.creditExposure = 0,
     this.creditBreach = false,
     this.stockShort = false,
+    this.belowPrice = false,
   });
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
@@ -46,6 +47,7 @@ class Order {
     creditExposure: (j['credit_exposure'] as num? ?? 0).toDouble(),
     creditBreach: j['credit_breach'] as bool? ?? false,
     stockShort: j['stock_short'] as bool? ?? false,
+    belowPrice: j['below_min_price'] as bool? ?? false,
     items: [
       for (final i in j['items'] as List)
         OrderItem.fromJson(i as Map<String, dynamic>),
@@ -62,6 +64,7 @@ class Order {
   final double creditExposure;
   final bool creditBreach;
   final bool stockShort;
+  final bool belowPrice;
   final List<OrderItem> items;
 
   Order copyWith({String? status, String? note}) => Order(
@@ -76,6 +79,7 @@ class Order {
     creditExposure: creditExposure,
     creditBreach: creditBreach,
     stockShort: stockShort,
+    belowPrice: belowPrice,
   );
 }
 
@@ -434,4 +438,70 @@ class DayView {
   final double extractionPct;
   final int downtimeMin;
   final List<MillAlert> alerts;
+}
+
+/// Management P&L for a month, from recorded transactions.
+class Pnl {
+  const Pnl({
+    required this.from,
+    required this.to,
+    required this.sales,
+    required this.cost,
+    required this.profit,
+    required this.marginPct,
+    required this.collected,
+  });
+
+  factory Pnl.fromJson(Map<String, dynamic> j) => Pnl(
+    from: j['from'] as String,
+    to: j['to'] as String,
+    sales: (j['sales'] as num).toDouble(),
+    cost: (j['cost_of_goods'] as num).toDouble(),
+    profit: (j['gross_profit'] as num).toDouble(),
+    marginPct: (j['margin_pct'] as num).toDouble(),
+    collected: (j['collected'] as num).toDouble(),
+  );
+
+  final String from;
+  final String to;
+  final double sales;
+  final double cost;
+  final double profit;
+  final double marginPct;
+  final double collected;
+}
+
+/// Opening, received, issued and closing for one item.
+class StockLine {
+  const StockLine(
+    this.code,
+    this.opening,
+    this.received,
+    this.issued,
+    this.closing,
+  );
+  final String code;
+  final double opening;
+  final double received;
+  final double issued;
+  final double closing;
+}
+
+/// The month's stock statement and whether it matches the ledger.
+class StockReport {
+  const StockReport(this.lines, this.reconciled);
+
+  factory StockReport.fromJson(Map<String, dynamic> j) => StockReport([
+    for (final i in j['items'] as List)
+      StockLine(
+        i['item_code'] as String,
+        (i['opening'] as num).toDouble(),
+        (i['received'] as num).toDouble(),
+        (i['issued'] as num).toDouble(),
+        (i['closing'] as num).toDouble(),
+      ),
+  ], j['reconciled'] as bool);
+
+  final List<StockLine> lines;
+  final bool reconciled;
 }

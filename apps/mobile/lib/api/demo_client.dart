@@ -66,6 +66,7 @@ class DemoClient extends ErpNextClient {
       creditLimit: 80000,
       creditExposure: 46000,
       stockShort: true,
+      belowPrice: true,
       items: [
         OrderItem(
           itemCode: 'MAIDA-50KG',
@@ -559,6 +560,24 @@ class DemoClient extends ErpNextClient {
       ),
     ],
   );
+
+  @override
+  Future<Pnl> profitAndLoss() async => const Pnl(
+    from: '2026-10-01',
+    to: '2026-10-31',
+    sales: 486000,
+    cost: 412000,
+    profit: 74000,
+    marginPct: 15.2,
+    collected: 310000,
+  );
+
+  @override
+  Future<StockReport> stockStatement() async => StockReport(const [
+    StockLine('WHEAT', 60000, 40000, 15000, 85000),
+    StockLine('ATTA-BULK', 8000, 10500, 6500, 12000),
+    StockLine('ATTA-10KG', 100, 300, 280, 120),
+  ], true);
 
   @override
   Future<Order> sendBack(String name, String reason) async =>
