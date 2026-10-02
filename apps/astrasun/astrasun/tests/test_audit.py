@@ -1,11 +1,7 @@
 import frappe
-from frappe.tests.utils import FrappeTestCase
 
 from astrasun.audit import REASON_FIELD, ReasonRequiredError
-
-
-def _company():
-	return frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name")[0]
+from astrasun.tests.helpers import MillFixture
 
 
 def _logs(doc):
@@ -17,11 +13,7 @@ def _logs(doc):
 	)
 
 
-class TestAudit(FrappeTestCase):
-	def setUp(self):
-		self.company = _company()
-		self.abbr = frappe.get_cached_value("Company", self.company, "abbr")
-
+class TestAudit(MillFixture):
 	def _item_price(self, rate=1500):
 		price_list = frappe.get_doc(
 			{"doctype": "Price List", "price_list_name": frappe.generate_hash(length=10), "selling": 1}
