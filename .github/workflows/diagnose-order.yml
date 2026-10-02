@@ -1,0 +1,53 @@
+# Rehearsal on a throwaway copy of the server stack (same image as the server: ERPNext v15 + India
+# Compliance + astrasun): send the order the phone sends ("Send for approval") as the different kinds
+# of user, and print the server's own answer. Nothing here touches the live test server. Runs when
+# the files below change on the test branch, or by hand from the Actions tab.
+name: Diagnose order
+
+on:
+  push:
+    branches: [claude/project-thread-z9q9jp]
+    paths:
+      - ".github/workflows/diagnose-order.yml"
+      - ".github/diagnose/order_rehearsal.py"
+      - ".github/diagnose/stack.sh"
+  workflow_dispatch:
+
+concurrency:
+  group: diagnose-order
+  cancel-in-progress: true
+
+env:
+  ADMIN_PASSWORD: ci-admin-pass-1
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image (same as the server)
+        run: docker build -f docker/Dockerfile -t astrasun:dev .
+
+      - name: Start the stack and finish the setup wizard with the real site's answers
+        run: |
+          .github/diagnose/stack.sh up
+          .github/diagnose/stack.sh wizard
+
+      - name: Send the order as each kind of user
+        run: |
+          .github/diagnose/stack.sh in -e ADMIN_PASSWORD backend \
+            bash -c 'cd /home/frappe/frappe-bench/sites && ../env/bin/python -' \
+            < .github/diagnose/order_rehearsal.py 2>&1 | tee order-rehearsal.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: order-rehearsal
+          path: order-rehearsal.txt
+
+      - name: Container logs
+        if: always()
+        working-directory: docker
+        run: docker compose logs --tail 80 backend
