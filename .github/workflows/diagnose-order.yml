@@ -11,6 +11,8 @@ on:
       - ".github/workflows/diagnose-order.yml"
       - ".github/diagnose/order_rehearsal.py"
       - ".github/diagnose/stack.sh"
+      - "docker/try-order.sh"
+      - "docker/try_order.py"
   workflow_dispatch:
 
 concurrency:
@@ -41,11 +43,58 @@ jobs:
             bash -c 'cd /home/frappe/frappe-bench/sites && ../env/bin/python -' \
             < .github/diagnose/order_rehearsal.py 2>&1 | tee order-rehearsal.txt
 
+      # docker/try-order.sh is what the server owner runs on the live server; prove it on the copy.
+      # The rehearsal above leaves the company registered, with an address that carries a GSTIN.
+      - name: try-order.sh with that address in place (every user should get OK)
+        run: |
+          echo "DOMAIN=ci.localhost" >> docker/.env
+          bash docker/try-order.sh 2>&1 | tee try-order-1.txt
+          grep -q "OK. It would be saved" try-order-1.txt
+          ! grep -q REFUSED try-order-1.txt
+
+      - name: try-order.sh with the company address switched off (should name the missing address)
+        run: |
+          .github/diagnose/stack.sh in backend bash -c 'cd sites && ../env/bin/python -' <<'EOF'
+          import frappe
+          frappe.init(site="mill.localhost", sites_path=".")
+          frappe.connect()
+          frappe.db.sql("update tabAddress set disabled = 1 where is_your_company_address = 1")
+          frappe.db.commit()
+          frappe.clear_cache()
+          EOF
+          bash docker/try-order.sh 2>&1 | tee try-order-2.txt
+          grep -q "REFUSED (MandatoryError): Please set Company Address Name" try-order-2.txt
+
+      - name: try-order.sh once the company is Unregistered again (every user should get OK)
+        run: |
+          .github/diagnose/stack.sh in backend bash -c 'cd sites && ../env/bin/python -' <<'EOF'
+          import frappe
+          frappe.init(site="mill.localhost", sites_path=".")
+          frappe.connect()
+          frappe.db.set_value("Company", "Astrasun Global LLP", "gst_category", "Unregistered")
+          frappe.db.commit()
+          frappe.clear_cache()
+          EOF
+          bash docker/try-order.sh "Gautam kumar singh" 2>&1 | tee try-order-3.txt
+          grep -q "OK. It would be saved" try-order-3.txt
+          ! grep -q REFUSED try-order-3.txt
+          # nothing may have been kept: the orders in the database are still the nine the rehearsal made
+          .github/diagnose/stack.sh in backend bash -c 'cd sites && ../env/bin/python -' <<'EOF'
+          import frappe
+          frappe.init(site="mill.localhost", sites_path=".")
+          frappe.connect()
+          n = frappe.db.count("Sales Order")
+          print("Sales Orders in the database:", n)
+          assert n == 9, n
+          EOF
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: order-rehearsal
-          path: order-rehearsal.txt
+          path: |
+            order-rehearsal.txt
+            try-order-*.txt
 
       - name: Container logs
         if: always()
