@@ -1,0 +1,20 @@
+# Updates the mill server with the latest code. Run it from the Actions tab,
+# after the server exists and the three secrets below are set.
+name: Deploy to server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update the server
+        env:
+          KEY: ${{ secrets.SERVER_SSH_KEY }}
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+        run: |
+          test -n "$HOST" || { echo "Set SERVER_HOST, SERVER_USER and SERVER_SSH_KEY in repository secrets"; exit 1; }
+          install -m 600 /dev/null key && printf '%s\n' "$KEY" > key
+          ssh -i key -o StrictHostKeyChecking=accept-new "$USER@$HOST" "cd /opt/astrasun && BRANCH=${GITHUB_REF_NAME} bash docker/deploy.sh"

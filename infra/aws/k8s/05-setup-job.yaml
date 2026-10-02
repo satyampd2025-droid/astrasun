@@ -1,0 +1,50 @@
+# One-off, safe to re-run: writes bench config, creates the site on first deploy, migrates on every deploy.
+# deploy.sh deletes the old Job before applying, so each deploy migrates the new image.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: astrasun-setup
+  namespace: astrasun
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: setup
+          image: ${IMAGE}
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -e
+              ls -1 apps > sites/apps.txt
+              bench set-config -g db_host "$DB_HOST"
+              bench set-config -gp db_port 3306
+              bench set-config -g redis_cache "$REDIS_CACHE"
+              bench set-config -g redis_queue "$REDIS_QUEUE"
+              bench set-config -g redis_socketio "$REDIS_QUEUE"
+              bench set-config -gp socketio_port 9000
+              if [ ! -d "sites/$SITE_NAME" ]; then
+                bench new-site "$SITE_NAME" --mariadb-user-host-login-scope='%' \
+                  --admin-password="$ADMIN_PASSWORD" --db-root-username=admin \
+                  --db-root-password="$DB_ROOT_PASSWORD" \
+                  --install-app erpnext --install-app india_compliance --install-app astrasun --set-default
+              fi
+              bench --site "$SITE_NAME" migrate
+          envFrom:
+            - configMapRef: {name: astrasun-config}
+          env:
+            - name: DB_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: astrasun-secrets, key: DB_ROOT_PASSWORD}}
+            - name: ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: astrasun-secrets, key: ADMIN_PASSWORD}}
+          volumeMounts:
+            - {name: sites, mountPath: /home/frappe/frappe-bench/sites}
+            - {name: logs, mountPath: /home/frappe/frappe-bench/logs}
+      volumes:
+        - name: sites
+          persistentVolumeClaim: {claimName: astrasun-sites}
+        - name: logs
+          emptyDir: {}

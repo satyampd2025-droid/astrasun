@@ -1,0 +1,284 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "WL-.YY.-.####",
+ "creation": "2026-10-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "supplier",
+  "supplier_name",
+  "vehicle_no",
+  "status",
+  "column_break_1",
+  "gate_in_at",
+  "rate_per_quintal",
+  "company",
+  "section_weight",
+  "party_weight_kg",
+  "gross_kg",
+  "tare_kg",
+  "column_break_2",
+  "net_kg",
+  "weight_gap_kg",
+  "weight_gap_pct",
+  "weight_alert",
+  "section_qc",
+  "moisture_pct",
+  "foreign_matter_pct",
+  "broken_pct",
+  "column_break_3",
+  "qc_by",
+  "qc_remarks",
+  "section_stock",
+  "purchase_receipt"
+ ],
+ "fields": [
+  {
+   "fieldname": "supplier",
+   "label": "Supplier",
+   "fieldtype": "Link",
+   "options": "Supplier",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "supplier_name",
+   "label": "Supplier Name",
+   "fieldtype": "Data",
+   "fetch_from": "supplier.supplier_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vehicle_no",
+   "label": "Vehicle Number",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "options": "At Gate\nWeighed In\nOn Hold\nReleased\nRejected\nReceived",
+   "default": "At Gate",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gate_in_at",
+   "label": "Gate In At",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "rate_per_quintal",
+   "label": "Rate per Quintal",
+   "fieldtype": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_weight",
+   "label": "Weighbridge",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "party_weight_kg",
+   "label": "Weight on Supplier's Slip (kg)",
+   "fieldtype": "Float",
+   "reqd": 1
+  },
+  {
+   "fieldname": "gross_kg",
+   "label": "Gross Weight (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "tare_kg",
+   "label": "Empty Truck Weight (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "net_kg",
+   "label": "Net Weight (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "weight_gap_kg",
+   "label": "Gap vs Slip (kg)",
+   "fieldtype": "Float",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "weight_gap_pct",
+   "label": "Gap vs Slip (%)",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "weight_alert",
+   "label": "Weight Mismatch",
+   "fieldtype": "Check",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_qc",
+   "label": "Quality Check",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "moisture_pct",
+   "label": "Moisture %",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "foreign_matter_pct",
+   "label": "Foreign Matter %",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "broken_pct",
+   "label": "Broken / Shrivelled %",
+   "fieldtype": "Percent",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qc_by",
+   "label": "Checked By",
+   "fieldtype": "Link",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "qc_remarks",
+   "label": "QC Remarks",
+   "fieldtype": "Small Text",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_stock",
+   "label": "Stock",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "purchase_receipt",
+   "label": "Purchase Receipt",
+   "fieldtype": "Link",
+   "options": "Purchase Receipt",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Astrasun",
+ "name": "Wheat Lot",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Mill Gate",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Purchase",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill QC",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Owner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Auditor",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "vehicle_no",
+ "track_changes": 1
+}

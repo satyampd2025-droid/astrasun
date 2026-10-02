@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  One self-contained Astrasun server (ERPNext + mill app in docker). Deploy it twice, EnvName=test and
+  EnvName=prod, as two separate stacks. Nothing is shared between them: own network, server, address,
+  backup bucket, password and IAM role.
+
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [test, prod]
+  DomainName:
+    Type: String
+    Description: "Address people will open, for example mill.example.com (for test: test-mill.example.com)"
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    Description: "t3.medium (4 GB) for prod. t3.small (2 GB) can do for test."
+  DiskGb:
+    Type: Number
+    Default: 40
+    MinValue: 30
+  GitHubTokenSecretArn:
+    Type: String
+    Default: ""
+    Description: Secrets Manager secret holding a read-only GitHub token (needed while the repository is private)
+  GitBranch:
+    Type: String
+    Default: claude/project-thread-bqz906
+  VpcCidr:
+    Type: String
+    Default: 10.20.0.0/24
+    Description: "Use a different range for test and prod (for example 10.21.0.0/24 for test)"
+
+Conditions:
+  UseToken: !Not [!Equals [!Ref GitHubTokenSecretArn, ""]]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}" }]
+
+  Gateway:
+    Type: AWS::EC2::InternetGateway
+
+  GatewayAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref Gateway }
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref VpcCidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttach
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Gateway
+
+  RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref Subnet, RouteTableId: !Ref RouteTable }
+
+  Firewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Web only. No SSH, use Session Manager to log in.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "astrasun-${EnvName}-backups-${AWS::AccountId}"
+      VersioningConfiguration: { Status: Enabled }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old
+            Status: Enabled
+            ExpirationInDays: 60
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+
+  AdminSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "astrasun/${EnvName}/admin-password"
+      GenerateSecretString:
+        PasswordLength: 20
+        ExcludePunctuation: true
+
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: ec2.amazonaws.com }, Action: "sts:AssumeRole" }
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: own-resources-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject, s3:ListBucket]
+                Resource: [!GetAtt BackupBucket.Arn, !Sub "${BackupBucket.Arn}/*"]
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !If [UseToken, [!Ref AdminSecret, !Ref GitHubTokenSecretArn], [!Ref AdminSecret]]
+
+  ServerProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref ServerRole] }
+
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref ServerProfile
+      SubnetId: !Ref Subnet
+      SecurityGroupIds: [!Ref Firewall]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs: { VolumeSize: !Ref DiskGb, VolumeType: gp3, Encrypted: true, DeleteOnTermination: false }
+      Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}" }]
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/usr/bin/env bash
+            set -euxo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -y && apt-get install -y ca-certificates curl git ufw awscli jq
+            command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
+            ufw allow 80 && ufw allow 443 && ufw --force enable
+            REGION=${AWS::Region}
+            ADMIN_PASSWORD=$(aws secretsmanager get-secret-value --region $REGION --secret-id ${AdminSecret} --query SecretString --output text)
+            URL=https://github.com/satyampd2025-droid/astrasun.git
+            ${TokenLine}
+            git clone -b ${GitBranch} $URL /opt/astrasun
+            cd /opt/astrasun
+            cat > docker/.env <<ENV
+            SITE_NAME=${DomainName}
+            DOMAIN=${DomainName}
+            ADMIN_PASSWORD=$ADMIN_PASSWORD
+            DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+            ENV
+            chmod 600 docker/.env
+            # Nightly backup 02:00 (database and files), copied to this environment's own bucket
+            cat > /usr/local/bin/astrasun-backup <<'BK'
+            #!/usr/bin/env bash
+            set -e
+            cd /opt/astrasun/docker
+            C="docker compose -f compose.yml -f compose.prod.yml"
+            SITE=$(grep ^SITE_NAME .env | cut -d= -f2)
+            $C exec -T backend bench --site $SITE backup --with-files
+            rm -rf /var/backups/astrasun && mkdir -p /var/backups/astrasun
+            $C cp backend:/home/frappe/frappe-bench/sites/$SITE/private/backups /var/backups/astrasun/
+            aws s3 sync /var/backups/astrasun s3://${BackupBucket}/ --region ${AWS::Region}
+            $C exec -T backend find sites/$SITE/private/backups -mtime +14 -delete
+            BK
+            chmod +x /usr/local/bin/astrasun-backup
+            echo "0 2 * * * root /usr/local/bin/astrasun-backup >> /var/log/astrasun-backup.log 2>&1" > /etc/cron.d/astrasun-backup
+            bash docker/deploy.sh
+          - TokenLine: !If
+              - UseToken
+              - !Sub "URL=https://x-access-token:$(aws secretsmanager get-secret-value --region $REGION --secret-id ${GitHubTokenSecretArn} --query SecretString --output text)@github.com/satyampd2025-droid/astrasun.git"
+              - "true"
+
+  Address:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Server
+
+Outputs:
+  ServerAddress:
+    Description: "Create a DNS A record for DomainName pointing to this address"
+    Value: !Ref Address
+  BackupBucketName:
+    Value: !Ref BackupBucket
+  AdminPasswordSecret:
+    Description: Administrator password for the first login is stored here
+    Value: !Ref AdminSecret
+  Login:
+    Description: "Log in without SSH: AWS console, Systems Manager, Session Manager"
+    Value: !Ref Server

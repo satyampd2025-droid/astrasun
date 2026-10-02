@@ -1,0 +1,123 @@
+import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+FIELDS = [
+	{
+		"fieldname": "astrasun_section",
+		"label": "Mill approval",
+		"fieldtype": "Section Break",
+		"insert_after": "scan_barcode",
+		"collapsible": 1,
+	},
+	{
+		"fieldname": "astrasun_approval_status",
+		"label": "Approval Status",
+		"fieldtype": "Select",
+		"options": "Draft\nPending Approval\nApproved\nRejected\nSent Back",
+		"default": "Draft",
+		"in_list_view": 1,
+		"in_standard_filter": 1,
+		"allow_on_submit": 1,
+		"no_copy": 1,
+		"read_only": 1,
+		"insert_after": "astrasun_section",
+	},
+	{
+		"fieldname": "astrasun_submitted_by",
+		"label": "Sent for Approval By",
+		"fieldtype": "Link",
+		"options": "User",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_approval_status",
+	},
+	{
+		"fieldname": "astrasun_approved_by",
+		"label": "Decided By",
+		"fieldtype": "Link",
+		"options": "User",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_submitted_by",
+	},
+	{
+		"fieldname": "astrasun_approval_note",
+		"label": "Approval Note",
+		"fieldtype": "Small Text",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_approved_by",
+	},
+	{"fieldname": "astrasun_col", "fieldtype": "Column Break", "insert_after": "astrasun_approval_note"},
+	{
+		"fieldname": "astrasun_credit_outstanding",
+		"label": "Customer Outstanding",
+		"fieldtype": "Currency",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_col",
+	},
+	{
+		"fieldname": "astrasun_credit_limit",
+		"label": "Credit Limit",
+		"fieldtype": "Currency",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_credit_outstanding",
+	},
+	{
+		"fieldname": "astrasun_credit_exposure",
+		"label": "Exposure With This Order",
+		"fieldtype": "Currency",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_credit_limit",
+	},
+	{
+		"fieldname": "astrasun_credit_breach",
+		"label": "Over Credit Limit",
+		"fieldtype": "Check",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_credit_exposure",
+	},
+	{
+		"fieldname": "astrasun_stock_short",
+		"label": "Stock Short",
+		"fieldtype": "Check",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_credit_breach",
+	},
+	{
+		"fieldname": "astrasun_below_price",
+		"label": "Below Minimum Price",
+		"fieldtype": "Check",
+		"read_only": 1,
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_stock_short",
+	},
+	{
+		"fieldname": "astrasun_remarks",
+		"label": "Remarks",
+		"fieldtype": "Small Text",
+		"no_copy": 1,
+		"allow_on_submit": 1,
+		"insert_after": "astrasun_below_price",
+	},
+]
+
+
+def setup_order_fields():
+	create_custom_fields({"Sales Order": FIELDS}, ignore_validate=True)
+	# The owner may override the customer credit limit; managers cannot
+	frappe.db.set_single_value("Accounts Settings", "credit_controller", "Mill Owner")

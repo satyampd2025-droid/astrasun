@@ -1,0 +1,21 @@
+# Production overlay: HTTPS in front of the stack, nothing else exposed.
+#   docker compose -f compose.yml -f compose.prod.yml up -d
+# Needs DOMAIN in docker/.env (e.g. mill.atulyaa.in) pointing at this server.
+services:
+  frontend:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in docker/.env} --to frontend:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - frontend
+
+volumes:
+  caddy-data:

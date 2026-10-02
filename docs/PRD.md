@@ -1,6 +1,7 @@
 # Astrasun: Aata Mill App (PRD)
 
 **Mockups:** https://www.figma.com/design/huj5alfaNPY5mUAxb2z54p
+**Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## What it is
 - One app to run the whole mill: wheat in → flour out → sold → paid.

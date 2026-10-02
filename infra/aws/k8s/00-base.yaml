@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: astrasun
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: astrasun-config
+  namespace: astrasun
+data:
+  SITE_NAME: "${SITE_NAME}"
+  DB_HOST: "${DB_HOST}"
+  REDIS_CACHE: "redis://${REDIS_CACHE}:6379"
+  REDIS_QUEUE: "redis://${REDIS_QUEUE}:6379"
+---
+# The "sites" folder (site config, uploaded files) lives on EFS so every pod shares it.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: astrasun-sites
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs-static
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: "${EFS_ID}::${EFS_ACCESS_POINT}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: astrasun-sites
+  namespace: astrasun
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: efs-static
+  volumeName: astrasun-sites
+  resources:
+    requests:
+      storage: 5Gi
