@@ -88,6 +88,48 @@ jobs:
           assert n == 9, n
           EOF
 
+      # What the live server showed: an account with the Mill Sales job but without the Sales User role
+      # ("does not have doctype access via role permission for document Sales Order").
+      - name: Account with a mill job but not its standard roles (refused, then repaired the way a migrate does)
+        run: |
+          .github/diagnose/stack.sh in backend bash -c 'cd sites && ../env/bin/python -' <<'EOF'
+          import frappe
+          frappe.init(site="mill.localhost", sites_path=".")
+          frappe.connect()
+          frappe.set_user("Administrator")
+          email = "ticked-only@example.com"
+          user = frappe.get_doc({"doctype": "User", "email": email, "first_name": "ticked", "send_welcome_email": 0})
+          user.append("roles", {"role": "Mill Sales"})
+          user.insert()
+          print("Saved with only Mill Sales ticked, the account holds:", sorted(r.role for r in user.roles))
+          assert "Sales User" in {r.role for r in user.roles}, "the standard role was not added on save"
+          # make it look like an account made before this change: take the standard role away behind the app's back
+          frappe.db.delete("Has Role", {"parent": email, "role": "Sales User"})
+          frappe.db.commit()
+          frappe.clear_cache(user=email)
+          EOF
+          bash docker/try-order.sh 2>&1 | tee try-order-4.txt
+          grep -A1 "As ticked-only@example.com" try-order-4.txt | grep -q "does not have doctype access via role permission for document Sales Order"
+          .github/diagnose/stack.sh in backend bash -c 'cd sites && ../env/bin/python -' <<'EOF'
+          import frappe
+          frappe.init(site="mill.localhost", sites_path=".")
+          frappe.connect()
+          frappe.set_user("Administrator")
+          from astrasun.setup.roles import sync_users
+          sync_users()
+          frappe.db.commit()
+          EOF
+          bash docker/try-order.sh 2>&1 | tee try-order-5.txt
+          grep -A1 "As ticked-only@example.com" try-order-5.txt | grep -q "OK. It would be saved"
+          ! grep -q REFUSED try-order-5.txt
+
+      # The app's own tests for the same thing. Last, because ERPNext's test setup changes site defaults.
+      - name: The app's role tests
+        continue-on-error: true
+        run: |
+          .github/diagnose/stack.sh in backend bench --site mill.localhost set-config -p allow_tests true
+          .github/diagnose/stack.sh in backend timeout 900 bench --site mill.localhost run-tests --module astrasun.tests.test_setup 2>&1 | tee role-tests.txt
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -95,6 +137,7 @@ jobs:
           path: |
             order-rehearsal.txt
             try-order-*.txt
+            role-tests.txt
 
       - name: Container logs
         if: always()

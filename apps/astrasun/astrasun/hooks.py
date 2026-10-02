@@ -19,5 +19,7 @@ doc_events = {
 		"on_submit": "astrasun.audit.on_submit",
 		"before_cancel": "astrasun.audit.before_cancel",
 		"on_cancel": "astrasun.audit.on_cancel",
-	}
+	},
+	# A mill job always brings the standard roles it needs (see astrasun/setup/roles.py)
+	"User": {"validate": "astrasun.setup.roles.add_bundled_roles"},
 }

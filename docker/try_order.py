@@ -6,6 +6,7 @@ wizard's own account holds them all). Nothing is saved: every try is rolled back
 off for the whole run.
 """
 
+import json
 import os
 import re
 import traceback
@@ -17,6 +18,7 @@ frappe.connect()
 frappe.db.commit = lambda *args, **kwargs: None  # whatever the code under test does, nothing is kept
 
 from astrasun import orders  # noqa: E402  (needs the site connection first)
+from astrasun.setup.roles import ROLE_PROFILES  # noqa: E402
 
 SELLING_JOBS = ["Mill Sales", "Mill Manager", "Mill Owner"]
 
@@ -63,15 +65,44 @@ def show_facts(customer, item):
 	say(f"Item:      {item['item_code']} ({item['item_name']}), group {group}, HSN {hsn}, warehouse {warehouse}, price {item['rate']}")
 	cgroup, ccategory = frappe.db.get_value("Customer", customer, ["customer_group", "gst_category"])
 	say(f"Customer:  {customer} (group {cgroup}, GST category {ccategory})")
+	filters = {"parenttype": "Role Profile", "parent": "Mill Sales"}
+	profile = frappe.get_all("Has Role", filters=filters, pluck="role")
+	say(f"Role Profile Mill Sales brings: {', '.join(profile) or 'nothing (profile missing)'}")
+
+
+def describe(user):
+	"""The user's name, mill jobs and whether ERPNext lets them create a Sales Order."""
+	if user == "Administrator":
+		return user
+	roles = set(frappe.get_roles(user))
+	jobs = ", ".join(job for job in ROLE_PROFILES if job in roles) or "none"
+	may = "yes" if frappe.has_permission("Sales Order", "create", user=user) else "no"
+	return f"{user} (mill jobs: {jobs}; may create Sales Orders: {may})"
+
+
+def printed():
+	"""What the server printed to the user while refusing: the line the phone shows when the error has no text."""
+	said = []
+	for entry in frappe.local.message_log or []:
+		if isinstance(entry, str):
+			try:
+				entry = json.loads(entry)
+			except ValueError:
+				entry = {"message": entry}
+		text = plain(entry.get("message", "")) if isinstance(entry, dict) else ""
+		if text:
+			said.append(text)
+	return " | ".join(said)
 
 
 def attempt(user, customer, item):
 	frappe.set_user(user)
+	frappe.local.message_log = []
 	try:
 		order = orders.create_order(customer, [{"item_code": item["item_code"], "qty": 1, "rate": item["rate"]}])
 		return f"OK. It would be saved and sent for approval as {order['name']} (rolled back, nothing kept)."
 	except Exception as error:
-		detail = plain(error) or type(error).__name__
+		detail = plain(error) or printed() or type(error).__name__
 		if not isinstance(error, frappe.ValidationError | frappe.PermissionError):
 			detail += " | " + " / ".join(traceback.format_exc().strip().splitlines()[-4:])
 		return f"REFUSED ({type(error).__name__}): {detail}"
@@ -96,7 +127,7 @@ try:
 		]
 		say()
 		for user in users[:8]:
-			say(f"As {user}:")
+			say(f"As {describe(user)}:")
 			say(f"  {attempt(user, customer, item)}")
 finally:
 	frappe.db.rollback()

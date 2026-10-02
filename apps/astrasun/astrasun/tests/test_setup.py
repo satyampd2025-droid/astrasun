@@ -2,7 +2,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from astrasun.setup.masters import PACK_SIZES, WAREHOUSES, bag_code, setup_mill, sku_code
-from astrasun.setup.roles import ROLE_PROFILES
+from astrasun.setup.roles import ROLE_PROFILES, sync_users
 
 
 class TestSetup(FrappeTestCase):
@@ -12,11 +12,37 @@ class TestSetup(FrappeTestCase):
 		)
 		self.abbr = frappe.get_cached_value("Company", self.company, "abbr")
 
+	def _account(self, email, *roles):
+		"""A user made the way the back-office form allows: roles ticked one by one, no Role Profile."""
+		user = frappe.get_doc(
+			{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+		)
+		for role in roles:
+			user.append("roles", {"role": role})
+		return user.insert(ignore_permissions=True)
+
 	def test_role_profiles(self):
 		for name in ROLE_PROFILES:
 			roles = {r.role for r in frappe.get_doc("Role Profile", name).roles}
 			self.assertIn(name, roles)
 		self.assertIn("Sales User", {r.role for r in frappe.get_doc("Role Profile", "Mill Sales").roles})
+
+	def test_mill_job_brings_its_standard_roles(self):
+		"""Ticking only the mill job is enough: the roles ERPNext checks for come with it."""
+		user = self._account("ticked-only@example.com", "Mill Sales")
+		self.assertIn("Sales User", {r.role for r in user.roles})
+		self.assertTrue(frappe.has_permission("Sales Order", "create", user=user.name))
+
+	def test_no_job_no_extra_roles(self):
+		user = self._account("no-job@example.com", "Sales User")
+		self.assertEqual({r.role for r in user.roles}, {"Sales User"})
+
+	def test_accounts_made_before_the_hook_are_repaired(self):
+		user = self._account("older-account@example.com", "Mill Warehouse")
+		frappe.db.delete("Has Role", {"parent": user.name, "role": "Stock User"})
+		self.assertNotIn("Stock User", {r.role for r in frappe.get_doc("User", user.name).roles})
+		sync_users()
+		self.assertIn("Stock User", {r.role for r in frappe.get_doc("User", user.name).roles})
 
 	def test_warehouses(self):
 		for warehouse in WAREHOUSES:

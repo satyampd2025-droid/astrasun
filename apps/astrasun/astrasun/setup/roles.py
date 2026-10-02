@@ -56,3 +56,30 @@ def setup_roles():
 			if role not in existing:
 				profile.append("roles", {"role": role})
 		profile.save(ignore_permissions=True)
+
+
+def bundled_roles(held):
+	"""Standard roles that the mill jobs among `held` bring with them and that `held` does not have yet."""
+	wanted = {role for job, bundle in ROLE_PROFILES.items() if job in held for role in bundle}
+	return sorted(role for role in wanted - set(held) if frappe.db.exists("Role", role))
+
+
+def add_bundled_roles(doc, method=None):
+	"""User validate hook: whoever holds a mill job also holds the standard roles that job needs.
+
+	The Role Profile already does this, but an account made by ticking roles one by one would have the
+	job and none of its permissions: ERPNext then refuses the work ("does not have doctype access via
+	role permission for document Sales Order").
+	"""
+	for role in bundled_roles({row.role for row in doc.roles}):
+		doc.append("roles", {"role": role})
+
+
+def sync_users():
+	"""Bring accounts made before add_bundled_roles existed up to date. Runs after every migrate."""
+	filters = {"parenttype": "User", "role": ["in", list(ROLE_PROFILES)]}
+	accounts = set(frappe.get_all("Has Role", filters=filters, pluck="parent")) - {"Administrator", "Guest"}
+	for name in sorted(accounts):
+		doc = frappe.get_doc("User", name)
+		if bundled_roles({row.role for row in doc.roles}):
+			doc.save(ignore_permissions=True)
