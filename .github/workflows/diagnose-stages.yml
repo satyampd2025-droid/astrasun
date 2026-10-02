@@ -1,0 +1,79 @@
+# Temporary rehearsal: run the app's server tests on a throwaway copy of the server stack (same image as
+# the server). Frappe is not installed where the code is written, so this is where the tests that need a
+# database run. Nothing here touches the live test server. Never merged.
+name: Diagnose stages
+
+on:
+  push:
+    branches: [claude/ci-rehearsal]
+  workflow_dispatch:
+    inputs:
+      modules:
+        description: "Test modules to run, space separated"
+        default: "test_acceptance test_api test_audit test_dashboard test_delivery_payments test_invoicing test_loading test_milling test_order_stages test_orders test_packing test_setup test_stages test_vehicles test_wheat"
+
+concurrency:
+  group: diagnose-stages
+  cancel-in-progress: true
+
+env:
+  ADMIN_PASSWORD: ci-admin-pass-1
+  MODULES: ${{ github.event.inputs.modules || 'test_acceptance test_api test_audit test_dashboard test_delivery_payments test_invoicing test_loading test_milling test_order_stages test_orders test_packing test_setup test_stages test_vehicles test_wheat' }}
+
+jobs:
+  stages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image (same as the server)
+        run: docker build -f docker/Dockerfile -t astrasun:dev .
+
+      - name: Start the stack and finish the setup wizard with the real site's answers
+        run: |
+          .github/diagnose/stack.sh up
+          .github/diagnose/stack.sh wizard
+
+      - name: Which company the site calls its default, before any test runs
+        run: |
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.defaults.get_global_default --args '("company",)'
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.db.get_single_value --args '("Global Defaults","default_company")'
+
+      - name: The app's server tests, one module at a time
+        run: |
+          .github/diagnose/stack.sh in backend bench --site mill.localhost set-config -p allow_tests True
+          failed=""
+          for m in $MODULES; do
+            echo "::group::$m"
+            .github/diagnose/stack.sh in backend timeout 1500 bench --site mill.localhost run-tests --module astrasun.tests.$m > "$m.txt" 2>&1 || true
+            tail -n 40 "$m.txt"
+            echo "::endgroup::"
+            if grep -qE "^(FAILED|ERROR)|Traceback" "$m.txt"; then failed="$failed $m"; fi
+          done
+          echo "modules that failed:${failed:- none}"
+          [ -z "$failed" ]
+
+      - name: Which company is the default after the tests, and what the test runner does before them
+        if: always()
+        run: |
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.defaults.get_global_default --args '("company",)'
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.db.get_single_value --args '("Global Defaults","default_company")'
+          .github/diagnose/stack.sh in backend bash -c 'cd /home/frappe/frappe-bench/apps && grep -n "before_tests" */*/hooks.py; for f in $(grep -rl "def before_tests" --include=*.py .); do echo "== $f"; grep -n -A25 "def before_tests" $f; done; echo "== who sets a default company"; grep -rn "set_global_default\|set_default(.company" --include=*.py erpnext/erpnext/setup/utils.py india_compliance/india_compliance/tests 2>/dev/null | head -20'
+
+      - name: What the tests left behind in the mill's masters
+        if: always()
+        run: |
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.db.sql --args "(\"select name from tabWarehouse where name regexp '^Raw Wheat'\",)"
+          .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.db.sql --args "(\"select company from \`tabItem Default\` where parent = 'ATTA-50KG'\",)"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage-tests
+          path: test_*.txt
+
+      - name: Container logs
+        if: always()
+        working-directory: docker
+        run: docker compose logs --tail 80 backend
