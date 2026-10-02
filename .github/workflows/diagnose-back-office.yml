@@ -1,0 +1,69 @@
+# Reproduces back-office problems on a throwaway copy of the server stack (same image as the
+# server: ERPNext v15 + India Compliance + astrasun) in a real browser. Nothing here touches
+# the live test server. Runs when this file or .github/diagnose/ changes on the test branch,
+# or by hand from the Actions tab.
+name: Diagnose back-office
+
+on:
+  push:
+    branches: [claude/project-thread-z9q9jp]
+    paths:
+      - ".github/workflows/diagnose-back-office.yml"
+      - ".github/diagnose/**"
+  workflow_dispatch:
+
+concurrency:
+  group: diagnose-back-office
+  cancel-in-progress: true
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      ADMIN_PASSWORD: ci-admin-pass-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the server image
+        run: docker build -f docker/Dockerfile -t astrasun:dev .
+
+      - name: Start the stack and create the site
+        working-directory: docker
+        run: |
+          printf 'SITE_NAME=mill.localhost\nADMIN_PASSWORD=%s\nDB_ROOT_PASSWORD=ci-root-pass-1\nHTTP_PORT=8080\n' "$ADMIN_PASSWORD" > .env
+          docker compose up -d
+          docker compose wait create-site || { docker compose logs --tail 80 create-site; exit 1; }
+
+      - name: Finish the setup wizard with the same answers as the real site
+        working-directory: docker
+        run: |
+          B="docker compose exec -T backend bench --site mill.localhost"
+          if ! $B execute frappe.desk.page.setup_wizard.setup_wizard.setup_complete \
+              --args '({"language":"English","country":"India","timezone":"Asia/Kolkata","currency":"INR","company_name":"Astrasun Global LLP","company_abbr":"AGL","chart_of_accounts":"India - Chart of Accounts","fy_start_date":"2026-04-01","fy_end_date":"2027-03-31"},)'; then
+            echo "::warning::wizard call failed, marking setup complete directly"
+            $B execute frappe.db.set_single_value --args '("System Settings","setup_complete",1)'
+          fi
+          $B execute frappe.db.sql --args '("select (select count(*) from tabCompany) companies, (select count(*) from tabItem) items",)'
+
+      - name: Wait for the web server
+        run: curl -fsS --retry 60 --retry-delay 5 --retry-connrefused --retry-all-errors http://localhost:8080/api/method/ping
+
+      - name: Reproduce in a real browser
+        working-directory: .github/diagnose
+        run: |
+          npm init -y >/dev/null
+          npm i playwright-core@1.49.1 >/dev/null
+          mkdir -p out
+          node repro.js 2>&1 | tee out/log.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnose-output
+          path: .github/diagnose/out
+
+      - name: Container logs
+        if: failure()
+        working-directory: docker
+        run: docker compose logs --tail 60 backend create-site
