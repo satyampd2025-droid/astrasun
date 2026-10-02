@@ -2,9 +2,9 @@
 # Compliance + astrasun), why New Item failed in the back-office and whether the fix works. Nothing
 # here touches the live test server. Runs when the image files or .github/diagnose/ change on the
 # test branch, or by hand from the Actions tab.
-#   upgrade: old image on empty volumes -> browser check -> new image and `docker/deploy.sh` steps in
-#            place (the way the real server will be updated) -> browser check, with and without clear-cache
-#   fresh:   new image on empty volumes (the way a new environment starts) -> browser check
+#   fresh: new image on empty volumes (the way a new environment starts) -> browser check.
+# The update-in-place rehearsal (old image -> new image like docker/deploy.sh, with and without
+# clear-cache) already passed in run 4 (commit f205d02); stack.sh upgrade and Dockerfile.old remain for it.
 name: Diagnose back-office
 
 on:
@@ -26,67 +26,6 @@ env:
   ADMIN_PASSWORD: ci-admin-pass-1
 
 jobs:
-  upgrade:
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build the OLD image (the Dockerfile the test server runs today)
-        run: docker build -f .github/diagnose/Dockerfile.old -t astrasun:dev .
-
-      - name: Start the stack on empty volumes and finish the wizard
-        run: |
-          .github/diagnose/stack.sh up
-          .github/diagnose/stack.sh wizard
-
-      - name: Browser tools
-        working-directory: .github/diagnose
-        run: |
-          npm init -y >/dev/null
-          npm i playwright-core@1.49.1 >/dev/null
-          mkdir -p out
-
-      - name: "BEFORE: what the old image does (expected to fail)"
-        timeout-minutes: 12
-        working-directory: .github/diagnose
-        run: |
-          echo "===== script the page asks for"; ./serve_check.sh
-          PHASE=before SESSIONS=phone node repro.js 2>&1 | tee out/log-before.txt
-
-      - name: Build the NEW image (docker/Dockerfile with the fix)
-        run: docker build -f docker/Dockerfile -t astrasun:dev .
-
-      - name: Update the running stack the way docker/deploy.sh does
-        run: .github/diagnose/stack.sh upgrade
-
-      - name: "AFTER the update, before clearing the cache"
-        timeout-minutes: 12
-        working-directory: .github/diagnose
-        run: |
-          echo "===== what the running backend sees"; ./stack.sh in backend bash -s < assets_check.sh
-          echo "===== script the page asks for"; ./serve_check.sh
-          PHASE=after-update SESSIONS=phone node repro.js 2>&1 | tee out/log-after-update.txt
-
-      - name: AFTER clearing the cache
-        timeout-minutes: 12
-        working-directory: .github/diagnose
-        run: |
-          ./stack.sh in backend bench --site mill.localhost clear-cache
-          echo "===== script the page asks for"; ./serve_check.sh
-          PHASE=after-clear-cache SESSIONS=phone node repro.js 2>&1 | tee out/log-after-clear-cache.txt
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: upgrade-output
-          path: .github/diagnose/out
-
-      - name: Container logs
-        if: failure()
-        working-directory: docker
-        run: docker compose logs --tail 60 backend create-site
-
   fresh:
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -108,14 +47,14 @@ jobs:
           echo "===== frontend (nginx)"; ./stack.sh in frontend bash -s < assets_check.sh
           echo "===== script the page asks for"; ./serve_check.sh
 
-      - name: Browser check on phone and desktop
+      - name: Browser check on a phone-sized browser
         timeout-minutes: 15
         working-directory: .github/diagnose
         run: |
           npm init -y >/dev/null
           npm i playwright-core@1.49.1 >/dev/null
           mkdir -p out
-          PHASE=fresh SESSIONS=phone,desktop node repro.js 2>&1 | tee out/log-fresh.txt
+          PHASE=fresh SESSIONS=phone node repro.js 2>&1 | tee out/log-fresh.txt
 
       - uses: actions/upload-artifact@v4
         if: always()

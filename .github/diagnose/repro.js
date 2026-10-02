@@ -178,13 +178,16 @@ async function session(browser, label) {
 				await d.set_value('item_code', 'CI-TEST-ATTA-5KG');
 				await d.set_value('item_group', 'Products');
 				if (d.get_field('gst_hsn_code')) {
-					const hsn = await frappe.xcall('frappe.client.get_list', { doctype: 'GST HSN Code', fields: ['name'], limit_page_length: 1 });
+					// India Compliance only accepts 6 or 8 digit HSN/SAC codes. 1101 is wheat or meslin flour.
+					let hsn = await frappe.xcall('frappe.client.get_list', { doctype: 'GST HSN Code', filters: { name: '11010000' }, fields: ['name'] });
+					if (!hsn.length) hsn = await frappe.xcall('frappe.client.get_list', { doctype: 'GST HSN Code', filters: [['name', 'like', '________']], fields: ['name'], limit_page_length: 1 });
 					out.hsn = hsn[0] ? hsn[0].name : null;
 					if (hsn[0]) await d.set_value('gst_hsn_code', hsn[0].name);
 				}
+				out.valuesBeforeSave = JSON.stringify(d.get_values(true));
 				d.get_primary_btn().click();
 				await wait(7000);
-				const found = await frappe.xcall('frappe.client.get_list', { doctype: 'Item', filters: { item_code: 'CI-TEST-ATTA-5KG' }, fields: ['name', 'item_group', 'gst_hsn_code'] });
+				const found = await frappe.xcall('frappe.client.get_list', { doctype: 'Item', filters: { item_code: 'CI-TEST-ATTA-5KG' }, fields: ['name', 'item_group', 'gst_hsn_code', 'stock_uom', 'is_stock_item'] });
 				out.saved = found;
 				return out;
 			}),
