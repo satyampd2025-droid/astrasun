@@ -220,3 +220,75 @@ class Collected {
   final double amount;
   final double stillDue;
 }
+
+/// One truck of wheat on its way from gate to stock.
+class WheatTruck {
+  const WheatTruck({
+    required this.name,
+    required this.supplierName,
+    required this.vehicleNo,
+    required this.status,
+    required this.partyWeightKg,
+    this.grossKg = 0,
+    this.netKg = 0,
+    this.weightGapKg = 0,
+    this.weightAlert = false,
+    this.moisture = 0,
+    this.foreignMatter = 0,
+    this.broken = 0,
+  });
+
+  factory WheatTruck.fromJson(Map<String, dynamic> j) => WheatTruck(
+    name: j['name'] as String,
+    supplierName: (j['supplier_name'] ?? j['supplier']) as String,
+    vehicleNo: j['vehicle_no'] as String,
+    status: j['status'] as String,
+    partyWeightKg: (j['party_weight_kg'] as num).toDouble(),
+    grossKg: (j['gross_kg'] as num).toDouble(),
+    netKg: (j['net_kg'] as num).toDouble(),
+    weightGapKg: (j['weight_gap_kg'] as num).toDouble(),
+    weightAlert: j['weight_alert'] as bool,
+    moisture: (j['moisture_pct'] as num).toDouble(),
+    foreignMatter: (j['foreign_matter_pct'] as num).toDouble(),
+    broken: (j['broken_pct'] as num).toDouble(),
+  );
+
+  final String name;
+  final String supplierName;
+  final String vehicleNo;
+
+  /// At Gate, Weighed In, On Hold, Released, Rejected or Received.
+  final String status;
+  final double partyWeightKg;
+  final double grossKg;
+  final double netKg;
+  final double weightGapKg;
+  final bool weightAlert;
+  final double moisture;
+  final double foreignMatter;
+  final double broken;
+
+  WheatTruck copyWith({
+    String? status,
+    double? grossKg,
+    double? netKg,
+    double? weightGapKg,
+    bool? weightAlert,
+    double? moisture,
+    double? foreignMatter,
+    double? broken,
+  }) => WheatTruck(
+    name: name,
+    supplierName: supplierName,
+    vehicleNo: vehicleNo,
+    status: status ?? this.status,
+    partyWeightKg: partyWeightKg,
+    grossKg: grossKg ?? this.grossKg,
+    netKg: netKg ?? this.netKg,
+    weightGapKg: weightGapKg ?? this.weightGapKg,
+    weightAlert: weightAlert ?? this.weightAlert,
+    moisture: moisture ?? this.moisture,
+    foreignMatter: foreignMatter ?? this.foreignMatter,
+    broken: broken ?? this.broken,
+  );
+}

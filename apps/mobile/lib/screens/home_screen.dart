@@ -13,6 +13,7 @@ import 'loading_screen.dart';
 import 'my_orders_screen.dart';
 import 'new_order_screen.dart';
 import 'trucks_screen.dart';
+import 'wheat_screens.dart';
 
 /// "What I need to do now": big buttons for the user's mill roles.
 class HomeScreen extends StatelessWidget {
@@ -83,6 +84,9 @@ Widget _screenFor(Task task, ErpNextClient client, S s) => switch (task.label) {
   'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
   'My deliveries' => DeliveriesScreen(client: client),
   'Collect payment' || 'Customer dues' => DuesScreen(client: client),
+  'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),
+  'Weighbridge' => WeighbridgeScreen(client: client),
+  'Check wheat lot' => LabScreen(client: client),
   _ => ComingSoonScreen(title: s.t(task.label)),
 };
 

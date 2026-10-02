@@ -307,6 +307,114 @@ class DemoClient extends ErpNextClient {
     return Collected(amount, left);
   }
 
+  static const _suppliers = [
+    Customer('mandi1', 'Ram Lal Mandi Traders'),
+    Customer('farmer1', 'Kisan Agro Supplies'),
+  ];
+  final List<WheatTruck> _wheat = [
+    const WheatTruck(
+      name: 'WL-26-0001',
+      supplierName: 'Ram Lal Mandi Traders',
+      vehicleNo: 'MP04AB9999',
+      status: 'Weighed In',
+      partyWeightKg: 20000,
+      grossKg: 28000,
+    ),
+  ];
+
+  @override
+  Future<List<Customer>> suppliers() async => _suppliers;
+
+  @override
+  Future<List<WheatTruck>> wheatTrucks() async => [
+    for (final t in _wheat)
+      if (t.status != 'Received' && t.status != 'Rejected') t,
+  ];
+
+  @override
+  Future<WheatTruck> gateIn(
+    Customer supplier,
+    String vehicleNo,
+    double slipKg,
+    double ratePerQuintal,
+  ) async {
+    if (vehicleNo.trim().isEmpty || slipKg <= 0 || ratePerQuintal <= 0) {
+      throw Exception('gate');
+    }
+    final truck = WheatTruck(
+      name: 'WL-26-${(_wheat.length + 1).toString().padLeft(4, '0')}',
+      supplierName: supplier.displayName,
+      vehicleNo: vehicleNo.trim().toUpperCase(),
+      status: 'At Gate',
+      partyWeightKg: slipKg,
+    );
+    _wheat.add(truck);
+    return truck;
+  }
+
+  WheatTruck _setWheat(String name, WheatTruck Function(WheatTruck) change) {
+    final i = _wheat.indexWhere((t) => t.name == name);
+    return _wheat[i] = change(_wheat[i]);
+  }
+
+  @override
+  Future<WheatTruck> weighIn(WheatTruck t, double grossKg) async {
+    if (grossKg <= 0) throw Exception('gross');
+    return _setWheat(
+      t.name,
+      (x) => x.copyWith(status: 'Weighed In', grossKg: grossKg),
+    );
+  }
+
+  @override
+  Future<WheatTruck> checkWheat(
+    WheatTruck t, {
+    required double moisture,
+    required double foreignMatter,
+    required double broken,
+    required String decision,
+    String remarks = '',
+  }) async {
+    final bad = moisture > 14 || foreignMatter > 2;
+    // The lab alone cannot release wheat that is over the limits
+    if (decision == 'Release' && bad && role == 'Mill QC') {
+      throw Exception('limits');
+    }
+    if (decision != 'Release' && remarks.trim().isEmpty) {
+      throw Exception('reason');
+    }
+    return _setWheat(
+      t.name,
+      (x) => x.copyWith(
+        status: {
+          'Release': 'Released',
+          'Hold': 'On Hold',
+          'Reject': 'Rejected',
+        }[decision],
+        moisture: moisture,
+        foreignMatter: foreignMatter,
+        broken: broken,
+      ),
+    );
+  }
+
+  @override
+  Future<WheatTruck> weighOut(WheatTruck t, double tareKg) async {
+    final x = _wheat.firstWhere((w) => w.name == t.name);
+    if (tareKg <= 0 || tareKg >= x.grossKg) throw Exception('tare');
+    final net = x.grossKg - tareKg;
+    final gap = net - x.partyWeightKg;
+    return _setWheat(
+      t.name,
+      (w) => w.copyWith(
+        status: 'Received',
+        netKg: net,
+        weightGapKg: gap,
+        weightAlert: gap.abs() / w.partyWeightKg * 100 > 0.5,
+      ),
+    );
+  }
+
   @override
   Future<Order> sendBack(String name, String reason) async =>
       _set(name, 'Sent Back', reason);

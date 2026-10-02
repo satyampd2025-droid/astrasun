@@ -103,8 +103,8 @@ void main() {
     await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
     await logIn(tester);
-    expect(find.text('Wheat purchase'), findsOneWidget);
-    await tester.tap(find.text('Wheat purchase'));
+    expect(find.text('Supplier rates'), findsOneWidget);
+    await tester.tap(find.text('Supplier rates'));
     await tester.pumpAndSettle();
     expect(find.text('Coming soon'), findsOneWidget);
     expect(find.byKey(const Key('mic')), findsOneWidget);

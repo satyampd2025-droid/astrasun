@@ -267,6 +267,67 @@ class ErpNextClient {
     );
   }
 
+  WheatTruck _truck(dynamic j) =>
+      WheatTruck.fromJson(_message(j) as Map<String, dynamic>);
+
+  Future<List<Customer>> suppliers() async => [
+    for (final c
+        in _message(await _post('astrasun.wheat.suppliers', {})) as List)
+      Customer(c['name'] as String, c['supplier_name'] as String),
+  ];
+
+  Future<List<WheatTruck>> wheatTrucks() async => [
+    for (final t in _message(await _post('astrasun.wheat.trucks', {})) as List)
+      WheatTruck.fromJson(t as Map<String, dynamic>),
+  ];
+
+  Future<WheatTruck> gateIn(
+    Customer supplier,
+    String vehicleNo,
+    double slipKg,
+    double ratePerQuintal,
+  ) async => _truck(
+    await _post('astrasun.wheat.gate_in', {
+      'supplier': supplier.name,
+      'vehicle_no': vehicleNo,
+      'party_weight_kg': slipKg,
+      'rate_per_quintal': ratePerQuintal,
+    }),
+  );
+
+  Future<WheatTruck> weighIn(WheatTruck t, double grossKg) async => _truck(
+    await _post('astrasun.wheat.weigh_in', {
+      'name': t.name,
+      'gross_kg': grossKg,
+    }),
+  );
+
+  /// [decision] is Release, Hold or Reject.
+  Future<WheatTruck> checkWheat(
+    WheatTruck t, {
+    required double moisture,
+    required double foreignMatter,
+    required double broken,
+    required String decision,
+    String remarks = '',
+  }) async => _truck(
+    await _post('astrasun.wheat.check', {
+      'name': t.name,
+      'moisture_pct': moisture,
+      'foreign_matter_pct': foreignMatter,
+      'broken_pct': broken,
+      'decision': decision,
+      'remarks': remarks,
+    }),
+  );
+
+  Future<WheatTruck> weighOut(WheatTruck t, double tareKg) async => _truck(
+    await _post('astrasun.wheat.weigh_out', {
+      'name': t.name,
+      'tare_kg': tareKg,
+    }),
+  );
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }
