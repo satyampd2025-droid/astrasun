@@ -136,8 +136,15 @@ jobs:
       - name: The app's role tests
         continue-on-error: true
         run: |
-          .github/diagnose/stack.sh in backend bench --site mill.localhost set-config -p allow_tests true
+          .github/diagnose/stack.sh in backend bench --site mill.localhost set-config -p allow_tests True
           .github/diagnose/stack.sh in backend timeout 900 bench --site mill.localhost run-tests --module astrasun.tests.test_setup 2>&1 | tee role-tests.txt
+          ! grep -qE "^(FAILED|ERROR)|Traceback" role-tests.txt
+
+      - name: The app's delivery and payment tests (dues for a rep)
+        continue-on-error: true
+        run: |
+          .github/diagnose/stack.sh in backend timeout 1200 bench --site mill.localhost run-tests --module astrasun.tests.test_delivery_payments 2>&1 | tee payment-tests.txt
+          ! grep -qE "^(FAILED|ERROR)|Traceback" payment-tests.txt
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -148,6 +155,7 @@ jobs:
             try-order-*.txt
             dues-check.txt
             role-tests.txt
+            payment-tests.txt
 
       - name: Container logs
         if: always()
