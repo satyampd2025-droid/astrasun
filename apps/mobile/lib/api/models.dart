@@ -106,3 +106,56 @@ class OrderLine {
   double rate;
   double get amount => qty * rate;
 }
+
+/// A truck-loading job: an approved order that is waiting, being loaded, or loaded.
+class LoadingTask {
+  const LoadingTask({
+    required this.id,
+    required this.salesOrder,
+    required this.customerName,
+    required this.status,
+    required this.items,
+    this.vehicleNo,
+  });
+
+  factory LoadingTask.fromJson(Map<String, dynamic> json) => LoadingTask(
+    id: (json['name'] ?? json['sales_order']) as String,
+    salesOrder: json['sales_order'] as String,
+    customerName: (json['customer_name'] ?? json['customer']) as String,
+    status: json['status'] as String,
+    vehicleNo: json['vehicle_no'] as String?,
+    items: [
+      for (final i in json['items'] as List)
+        OrderItem(
+          itemCode: i['item_code'] as String,
+          itemName: i['item_name'] as String,
+          qty: (i['qty'] as num).toDouble(),
+          rate: 0,
+        ),
+    ],
+  );
+
+  /// The Delivery Note once loading has started, else the order name.
+  final String id;
+  final String salesOrder;
+  final String customerName;
+
+  /// Waiting, Loading or Loaded.
+  final String status;
+  final String? vehicleNo;
+  final List<OrderItem> items;
+
+  LoadingTask copyWith({
+    String? id,
+    String? status,
+    String? vehicleNo,
+    List<OrderItem>? items,
+  }) => LoadingTask(
+    id: id ?? this.id,
+    salesOrder: salesOrder,
+    customerName: customerName,
+    status: status ?? this.status,
+    vehicleNo: vehicleNo ?? this.vehicleNo,
+    items: items ?? this.items,
+  );
+}

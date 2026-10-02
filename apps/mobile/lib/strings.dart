@@ -67,6 +67,17 @@ const Map<String, Map<String, String>> _strings = {
     'Approved': 'मंज़ूर',
     'Rejected': 'मना किया',
     'Sent Back': 'वापस भेजा',
+    // Loading
+    'bags': 'बोरी',
+    'Waiting': 'इंतज़ार में',
+    'Loaded': 'लोड हो गया',
+    'Start loading': 'लोडिंग शुरू करें',
+    'Mark loaded': 'लोड पूरा',
+    'Vehicle number': 'गाड़ी नंबर',
+    'Enter the vehicle number': 'गाड़ी नंबर लिखें',
+    'Nothing to load': 'लोड करने को कुछ नहीं',
+    'Bags loaded': 'लोड की गई बोरी',
+    'Vehicle {0}': 'गाड़ी {0}',
     // Tasks
     'Approve orders': 'ऑर्डर मंज़ूर करें',
     'Today at the mill': 'आज मिल में',

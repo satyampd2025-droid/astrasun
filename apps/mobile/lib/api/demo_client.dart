@@ -131,7 +131,80 @@ class DemoClient extends ErpNextClient {
   }
 
   @override
-  Future<Order> approve(String name) async => _set(name, 'Approved');
+  Future<Order> approve(String name) async {
+    final done = _set(name, 'Approved');
+    _loading.add(
+      LoadingTask(
+        id: done.name,
+        salesOrder: done.name,
+        customerName: done.customerName,
+        status: 'Waiting',
+        items: done.items,
+      ),
+    );
+    return done;
+  }
+
+  final List<LoadingTask> _loading = [
+    LoadingTask(
+      id: 'SAL-ORD-0000',
+      salesOrder: 'SAL-ORD-0000',
+      customerName: 'Sharma Kirana Store',
+      status: 'Waiting',
+      items: [
+        OrderItem(
+          itemCode: 'ATTA-50KG',
+          itemName: 'Atta 50 kg',
+          qty: 40,
+          rate: 0,
+        ),
+        OrderItem(
+          itemCode: 'ATTA-10KG',
+          itemName: 'Atta 10 kg',
+          qty: 20,
+          rate: 0,
+        ),
+      ],
+    ),
+  ];
+
+  LoadingTask _setTask(String id, LoadingTask Function(LoadingTask) change) {
+    final i = _loading.indexWhere((t) => t.id == id);
+    return _loading[i] = change(_loading[i]);
+  }
+
+  @override
+  Future<List<LoadingTask>> loadingQueue() async => [
+    for (final t in _loading)
+      if (t.status != 'Loaded') t,
+  ];
+
+  @override
+  Future<LoadingTask> startLoading(LoadingTask task) async =>
+      _setTask(task.id, (t) => t.copyWith(status: 'Loading'));
+
+  @override
+  Future<LoadingTask> markLoaded(
+    LoadingTask task,
+    String vehicleNo,
+    Map<String, int> loaded,
+  ) async => _setTask(
+    task.id,
+    (t) => t.copyWith(
+      status: 'Loaded',
+      vehicleNo: vehicleNo,
+      items: [
+        for (final i in t.items)
+          if ((loaded[i.itemCode] ?? 0) > 0)
+            OrderItem(
+              itemCode: i.itemCode,
+              itemName: i.itemName,
+              qty: loaded[i.itemCode]!.toDouble(),
+              rate: 0,
+            ),
+      ],
+    ),
+  );
 
   @override
   Future<Order> reject(String name, String reason) async =>

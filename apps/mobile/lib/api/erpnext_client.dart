@@ -154,6 +154,43 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
+  Future<List<LoadingTask>> loadingQueue() async {
+    final m = _message(await _post('astrasun.loading.queue', {}));
+    return [
+      for (final t in [...m['loading'] as List, ...m['waiting'] as List])
+        LoadingTask.fromJson(t as Map<String, dynamic>),
+    ];
+  }
+
+  Future<LoadingTask> startLoading(LoadingTask task) async =>
+      LoadingTask.fromJson(
+        _message(
+              await _post('astrasun.loading.start', {
+                'sales_order': task.salesOrder,
+              }),
+            )
+            as Map<String, dynamic>,
+      );
+
+  /// [loaded] maps item code to the bags actually put on the truck.
+  Future<LoadingTask> markLoaded(
+    LoadingTask task,
+    String vehicleNo,
+    Map<String, int> loaded,
+  ) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.loading.mark_loaded', {
+            'name': task.id,
+            'vehicle_no': vehicleNo,
+            'items': [
+              for (final e in loaded.entries)
+                {'item_code': e.key, 'qty': e.value},
+            ],
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
   Future<void> setLanguage(String language) async {
     await _post('astrasun.api.set_language', {'language': language});
   }
