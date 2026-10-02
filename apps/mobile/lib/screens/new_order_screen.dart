@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 import '../widgets/voice_text_field.dart';
 
@@ -39,8 +40,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         _remarks.text.trim(),
       );
       setState(() => _sent = order);
-    } on Exception {
-      setState(() => _error = s.t('Could not save. Try again.'));
+    } on Exception catch (e) {
+      setState(() => _error = s.saveFailed(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -103,11 +104,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final catalog = snap.data!;
           return ListView(
             padding: const EdgeInsets.all(16),

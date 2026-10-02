@@ -61,6 +61,29 @@ const Map<String, List<Task>> roleTasks = {
   'Mill Auditor': [Task('Change log', Icons.history, 1)],
 };
 
+/// Roles that get the tiles dashboard; everyone else is floor staff and
+/// gets one big "next step" card.
+const officeRoles = {
+  'Mill Owner',
+  'Mill Manager',
+  'Mill Purchase',
+  'Mill Accounts',
+  'Mill Auditor',
+};
+
+bool isOffice(List<String> roles) => roles.any(officeRoles.contains);
+
+/// Roles that may receive payment on the Customer dues screen (the server
+/// checks the same list). Everyone else with that screen can only look.
+const collectorRoles = {
+  'Mill Driver',
+  'Mill Accounts',
+  'Mill Manager',
+  'Mill Owner',
+};
+
+bool mayCollect(List<String> roles) => roles.any(collectorRoles.contains);
+
 /// Tasks for someone with several roles, without repeating a task.
 List<Task> tasksFor(List<String> roles) {
   final seen = <String>{};

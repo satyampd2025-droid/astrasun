@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 
 /// Owner: the month's profit and loss and the stock statement.
@@ -24,11 +25,7 @@ class ReportsScreen extends StatelessWidget {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final pnl = snap.data![0] as Pnl;
           final stock = snap.data![1] as StockReport;
           Widget row(String label, String value, {Key? key}) => ListTile(

@@ -34,4 +34,18 @@ void main() {
   test('unknown roles give no tasks', () {
     expect(tasksFor(['Something Else']), isEmpty);
   });
+
+  test('only drivers, accounts, managers and the owner receive payment', () {
+    expect(mayCollect(['Mill Sales']), isFalse);
+    expect(mayCollect(['Mill Warehouse', 'Mill Gate']), isFalse);
+    for (final role in [
+      'Mill Driver',
+      'Mill Accounts',
+      'Mill Manager',
+      'Mill Owner',
+    ]) {
+      expect(mayCollect([role]), isTrue, reason: role);
+    }
+    expect(mayCollect(['Mill Sales', 'Mill Accounts']), isTrue);
+  });
 }

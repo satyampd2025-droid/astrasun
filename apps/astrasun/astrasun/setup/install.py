@@ -4,7 +4,7 @@ from astrasun.audit import setup_custom_fields
 from astrasun.setup.masters import setup_mill
 from astrasun.setup.loading import setup_loading_fields
 from astrasun.setup.orders import setup_order_fields
-from astrasun.setup.roles import setup_roles
+from astrasun.setup.roles import setup_roles, sync_users
 
 
 def after_install():
@@ -18,6 +18,7 @@ def after_install():
 
 def after_migrate():
 	setup_roles()
+	sync_users()
 	setup_custom_fields()
 	setup_order_fields()
 	setup_loading_fields()

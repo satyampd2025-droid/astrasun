@@ -45,7 +45,7 @@ services:
     command:
       - >
         ls -1 apps > sites/apps.txt;
-        bench set-config -g db_host db;
+        bench set-config -g db_host ${DB_HOST:-db};
         bench set-config -gp db_port 3306;
         bench set-config -g redis_cache redis://redis-cache:6379;
         bench set-config -g redis_queue redis://redis-queue:6379;
@@ -63,12 +63,12 @@ services:
     entrypoint: ["bash", "-c"]
     command:
       - >
-        wait-for-it -t 120 db:3306;
+        wait-for-it -t 120 ${DB_HOST:-db}:3306;
         wait-for-it -t 120 redis-cache:6379;
         wait-for-it -t 120 redis-queue:6379;
         until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]]; do sleep 5; done;
         [ -d sites/${SITE_NAME} ] || bench new-site ${SITE_NAME} --mariadb-user-host-login-scope='%'
-        --admin-password=${ADMIN_PASSWORD} --db-root-username=root --db-root-password=${DB_ROOT_PASSWORD}
+        --admin-password=${ADMIN_PASSWORD} --db-root-username=${DB_ROOT_USER:-root} --db-root-password=${DB_ROOT_PASSWORD}
         --install-app erpnext --install-app india_compliance --install-app astrasun --set-default;
         bench --site ${SITE_NAME} migrate;
     environment:

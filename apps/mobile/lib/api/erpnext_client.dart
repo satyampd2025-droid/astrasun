@@ -9,6 +9,16 @@ class LoginFailed implements Exception {}
 
 class ServerUnreachable implements Exception {}
 
+/// The server understood the request and refused it, with its own reason
+/// (for example "Please enter Delivery Date"). Screens show the reason as it is.
+class ServerRefused implements Exception {
+  ServerRefused(this.reason);
+  final String reason;
+
+  @override
+  String toString() => 'ServerRefused: $reason';
+}
+
 /// Who is logged in, from astrasun.api.me.
 class Me {
   Me({
@@ -80,10 +90,45 @@ class ErpNextClient {
   }
 
   dynamic _message(http.Response res) {
-    if (res.statusCode == 403) throw LoginFailed();
-    if (res.statusCode != 200) throw ServerUnreachable();
+    if (res.statusCode != 200) throw _refusal(res) ?? ServerUnreachable();
     return jsonDecode(res.body)['message'];
   }
+
+  /// The server's own words from a failed answer, or null when it gave none
+  /// (a proxy error page, a timeout).
+  ServerRefused? _refusal(http.Response res) {
+    try {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final raw = body['_server_messages'];
+      for (final item in raw is String ? jsonDecode(raw) as List : const []) {
+        final message = (item is String ? jsonDecode(item) : item)['message'];
+        if (message is String && _plain(message).isNotEmpty) {
+          return ServerRefused(_plain(message));
+        }
+      }
+      final exception = body['exception'];
+      if (exception is String && _plain(exception).isNotEmpty) {
+        return ServerRefused(_plain(exception.split('\n').first));
+      }
+    } on Object {
+      // not the server's JSON; fall through
+    }
+    return null;
+  }
+
+  /// Frappe messages carry a little HTML (bold names, line breaks) and, for
+  /// uncaught errors, the Python exception path in front of the text.
+  static String _plain(String text) => text
+      .replaceAll(RegExp(r'<br\s*/?>'), ' ')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceFirst(RegExp(r'^[\w.]+(Error|Exception): '), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 
   Future<Catalog> catalog() async {
     final m = _message(await _post('astrasun.orders.catalog', {}));

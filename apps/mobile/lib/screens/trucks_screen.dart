@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 
 enum TruckMode { invoice, dispatch }
@@ -33,11 +34,11 @@ class _TrucksScreenState extends State<TrucksScreen> {
       messenger.showSnackBar(
         SnackBar(content: Text('${t.customerName}: ${s.t(done)}')),
       );
-    } on Exception {
+    } on Exception catch (e) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            s.t('Could not save. Try again.'),
+            s.saveFailed(e),
             key: const Key('save-failed'),
           ),
         ),
@@ -62,11 +63,7 @@ class _TrucksScreenState extends State<TrucksScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final trucks = snap.data!;
           if (trucks.isEmpty) {
             return Center(

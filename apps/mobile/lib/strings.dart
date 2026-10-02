@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'api/erpnext_client.dart' show ServerRefused;
+
 /// All app text in English and Hindi. Keys are English so a missing Hindi
 /// string still shows something readable.
 const Map<String, Map<String, String>> _strings = {
@@ -15,6 +17,9 @@ const Map<String, Map<String, String>> _strings = {
         'सर्वर से संपर्क नहीं हो पा रहा। इंटरनेट देखें।',
     'Namaste, {0}': 'नमस्ते, {0}',
     'What to do now': 'अभी क्या करना है',
+    'Next for you': 'आपका अगला काम',
+    'Tap to start': 'शुरू करने के लिए दबाएं',
+    'More work': 'और काम',
     'No work assigned to your role yet. Ask the manager.':
         'आपके काम के लिए अभी कुछ तय नहीं है। मैनेजर से पूछें।',
     'Coming soon': 'जल्द आ रहा है',
@@ -219,4 +224,15 @@ class S {
     }
     return text;
   }
+
+  /// What to tell the user when a save fails: the server's own reason when it
+  /// gave one, else the plain "try again".
+  String saveFailed(Object error) =>
+      error is ServerRefused ? error.reason : t('Could not save. Try again.');
+
+  /// The same for a list that could not be loaded: the server's own reason
+  /// when it refused, else the plain "cannot reach the server".
+  String loadFailed(Object? error) => error is ServerRefused
+      ? error.reason
+      : t('Cannot reach the server. Check the internet.');
 }

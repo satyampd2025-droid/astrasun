@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
 import '../widgets/voice_text_field.dart';
 
@@ -71,11 +72,11 @@ class _MillingScreenState extends State<MillingScreen> {
       for (final c in [_wheat, _water, _atta, _maida, _sooji, _chokar]) {
         c.clear();
       }
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }
@@ -188,11 +189,11 @@ class _DowntimeScreenState extends State<DowntimeScreen> {
       _machine.clear();
       _minutes.clear();
       _reason.clear();
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }
@@ -255,11 +256,11 @@ class _PackScreenState extends State<PackScreen> {
     try {
       await widget.client.pack(sku, int.tryParse(bags) ?? 0);
       if (mounted) _snack(context, s.t('Packed: {0} bags', [bags]));
-    } on Exception {
+    } on Exception catch (e) {
       if (mounted) {
         _snack(
           context,
-          s.t('Could not save. Try again.'),
+          s.saveFailed(e),
           key: const Key('save-failed'),
         );
       }
@@ -356,11 +357,7 @@ class StockScreen extends StatelessWidget {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
-            return Center(
-              child: Text(s.t('Cannot reach the server. Check the internet.')),
-            );
-          }
+          if (snap.hasError) return LoadError(snap.error);
           final rows = snap.data!;
           return ListView(
             padding: const EdgeInsets.all(16),

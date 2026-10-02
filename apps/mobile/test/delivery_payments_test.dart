@@ -83,4 +83,17 @@ void main() {
     await tester.pumpAndSettle();
     expect((await state.client!.dues()).map((d) => d.customer), ['sharma']);
   });
+
+  testWidgets('sales rep looks at customer dues but cannot receive money', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await demoAs(tester, 'Mill Sales');
+    await tester.tap(find.text('Customer dues'));
+    await tester.pumpAndSettle();
+    expect(find.text('Verma Distributors'), findsOneWidget);
+    expect(find.byKey(const Key('receive-verma')), findsNothing);
+  });
 }

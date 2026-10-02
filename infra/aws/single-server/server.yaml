@@ -25,7 +25,20 @@ Parameters:
     Description: Secrets Manager secret holding a read-only GitHub token (needed while the repository is private)
   GitBranch:
     Type: String
-    Default: claude/project-thread-bqz906
+    Default: claude/project-thread-z9q9jp
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.small
+    Description: "Managed MariaDB (RDS) size. db.t4g.small is 2 GB."
+  DbBackupDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    Description: "Days of automatic database backups. The AWS Free plan allows only 1."
+  DbStorageGb:
+    Type: Number
+    Default: 20
+    MinValue: 20
   VpcCidr:
     Type: String
     Default: 10.20.0.0/24
@@ -33,6 +46,7 @@ Parameters:
 
 Conditions:
   UseToken: !Not [!Equals [!Ref GitHubTokenSecretArn, ""]]
+  IsProd: !Equals [!Ref EnvName, prod]
 
 Resources:
   Vpc:
@@ -54,9 +68,24 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref VpcCidr
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 6]]
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [0, !GetAZs ""]
+
+  # Database subnets: no internet route; RDS needs two availability zones
+  DbSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 6]]
+      AvailabilityZone: !Select [0, !GetAZs ""]
+
+  DbSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 6]]
+      AvailabilityZone: !Select [1, !GetAZs ""]
 
   RouteTable:
     Type: AWS::EC2::RouteTable
@@ -82,6 +111,70 @@ Resources:
       SecurityGroupIngress:
         - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0 }
         - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0 }
+
+  DbFirewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database reachable only from this environment server
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 3306, ToPort: 3306, SourceSecurityGroupId: !Ref Firewall }
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "astrasun ${EnvName} database subnets"
+      SubnetIds: [!Ref DbSubnetA, !Ref DbSubnetB]
+
+  DbParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: ERPNext needs utf8mb4
+      Family: mariadb10.6
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
+        innodb_read_only_compressed: "0"
+
+  # Database master login. Letters and digits only: RDS-generated passwords contain shell
+  # characters (; | $ >) that broke `bench new-site` and leaked parts of the password into logs.
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "astrasun/${EnvName}/db-master"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  # Managed MariaDB (RDS)
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "astrasun-${EnvName}-db"
+      Engine: mariadb
+      EngineVersion: "10.6.28"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: !Ref DbStorageGb
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      MasterUsername: admin  # must match the username in DbSecret
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbSecret}:SecretString:password}}"
+      ManageMasterUserPassword: false
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      DBParameterGroupName: !Ref DbParameterGroup
+      VPCSecurityGroups: [!GetAtt DbFirewall.GroupId]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: !Ref DbBackupDays
+      PreferredBackupWindow: "20:30-21:30"
+      DeletionProtection: !If [IsProd, true, false]
+      CopyTagsToSnapshot: true
+      Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}-db" }]
 
   BackupBucket:
     Type: AWS::S3::Bucket
@@ -132,13 +225,16 @@ Resources:
                 Resource: [!GetAtt BackupBucket.Arn, !Sub "${BackupBucket.Arn}/*"]
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !If [UseToken, [!Ref AdminSecret, !Ref GitHubTokenSecretArn], [!Ref AdminSecret]]
+                Resource: !If
+                  - UseToken
+                  - [!Ref AdminSecret, !Ref DbSecret, !Ref GitHubTokenSecretArn]
+                  - [!Ref AdminSecret, !Ref DbSecret]
 
   ServerProfile:
     Type: AWS::IAM::InstanceProfile
     Properties: { Roles: [!Ref ServerRole] }
 
-  Server:
+  AppServer:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
@@ -148,7 +244,7 @@ Resources:
       SecurityGroupIds: [!Ref Firewall]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
-          Ebs: { VolumeSize: !Ref DiskGb, VolumeType: gp3, Encrypted: true, DeleteOnTermination: false }
+          Ebs: { VolumeSize: !Ref DiskGb, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
       Tags: [{ Key: Name, Value: !Sub "astrasun-${EnvName}" }]
       UserData:
         Fn::Base64: !Sub
@@ -156,11 +252,18 @@ Resources:
             #!/usr/bin/env bash
             set -euxo pipefail
             export DEBIAN_FRONTEND=noninteractive
-            apt-get update -y && apt-get install -y ca-certificates curl git ufw awscli jq
+            apt-get update -y && apt-get install -y ca-certificates curl git ufw jq unzip
+            # Ubuntu 24.04 has no awscli package: use AWS's own installer
+            if ! command -v aws >/dev/null; then
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+              unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install && rm -rf /tmp/aws /tmp/awscliv2.zip
+            fi
             command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
             ufw allow 80 && ufw allow 443 && ufw --force enable
             REGION=${AWS::Region}
+            set +x  # never print passwords or the GitHub token into the boot log
             ADMIN_PASSWORD=$(aws secretsmanager get-secret-value --region $REGION --secret-id ${AdminSecret} --query SecretString --output text)
+            DB_SECRET=$(aws secretsmanager get-secret-value --region $REGION --secret-id ${DbSecretArn} --query SecretString --output text)
             URL=https://github.com/satyampd2025-droid/astrasun.git
             ${TokenLine}
             git clone -b ${GitBranch} $URL /opt/astrasun
@@ -169,15 +272,19 @@ Resources:
             SITE_NAME=${DomainName}
             DOMAIN=${DomainName}
             ADMIN_PASSWORD=$ADMIN_PASSWORD
-            DB_ROOT_PASSWORD=$(openssl rand -hex 16)
+            DB_HOST=${Database.Endpoint.Address}
+            DB_ROOT_USER=$(echo "$DB_SECRET" | jq -r .username)
+            DB_ROOT_PASSWORD=$(echo "$DB_SECRET" | jq -r .password)
             ENV
             chmod 600 docker/.env
+            set -x
             # Nightly backup 02:00 (database and files), copied to this environment's own bucket
             cat > /usr/local/bin/astrasun-backup <<'BK'
             #!/usr/bin/env bash
             set -e
             cd /opt/astrasun/docker
             C="docker compose -f compose.yml -f compose.prod.yml"
+            grep -q ^DB_HOST= .env && C="$C -f compose.rds.yml"
             SITE=$(grep ^SITE_NAME .env | cut -d= -f2)
             $C exec -T backend bench --site $SITE backup --with-files
             rm -rf /var/backups/astrasun && mkdir -p /var/backups/astrasun
@@ -188,7 +295,8 @@ Resources:
             chmod +x /usr/local/bin/astrasun-backup
             echo "0 2 * * * root /usr/local/bin/astrasun-backup >> /var/log/astrasun-backup.log 2>&1" > /etc/cron.d/astrasun-backup
             bash docker/deploy.sh
-          - TokenLine: !If
+          - DbSecretArn: !Ref DbSecret
+            TokenLine: !If
               - UseToken
               - !Sub "URL=https://x-access-token:$(aws secretsmanager get-secret-value --region $REGION --secret-id ${GitHubTokenSecretArn} --query SecretString --output text)@github.com/satyampd2025-droid/astrasun.git"
               - "true"
@@ -197,12 +305,15 @@ Resources:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
-      InstanceId: !Ref Server
+      InstanceId: !Ref AppServer
 
 Outputs:
   ServerAddress:
     Description: "Create a DNS A record for DomainName pointing to this address"
     Value: !Ref Address
+  DatabaseAddress:
+    Description: Managed MariaDB endpoint (private, reachable only from the server)
+    Value: !GetAtt Database.Endpoint.Address
   BackupBucketName:
     Value: !Ref BackupBucket
   AdminPasswordSecret:
@@ -210,4 +321,4 @@ Outputs:
     Value: !Ref AdminSecret
   Login:
     Description: "Log in without SSH: AWS console, Systems Manager, Session Manager"
-    Value: !Ref Server
+    Value: !Ref AppServer

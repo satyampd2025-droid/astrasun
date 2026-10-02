@@ -5,6 +5,8 @@ from frappe import _
 from frappe.utils import flt, nowdate
 
 COLLECTOR_ROLES = ("Mill Driver", "Mill Accounts", "Mill Manager", "Mill Owner")
+# A sales rep checks what a customer owes before taking an order (PRD), but does not receive money.
+VIEWER_ROLES = (*COLLECTOR_ROLES, "Mill Sales")
 MODES = ("Cash", "Bank")
 
 
@@ -12,9 +14,9 @@ class PaymentError(frappe.ValidationError):
 	pass
 
 
-def _check_role():
-	if not set(frappe.get_roles()).intersection(COLLECTOR_ROLES):
-		frappe.throw(_("Only drivers and accounts staff can collect payment"), frappe.PermissionError)
+def _check_role(roles, message):
+	if not set(frappe.get_roles()).intersection(roles):
+		frappe.throw(message, frappe.PermissionError)
 
 
 def _open_invoices(customer):
@@ -29,7 +31,7 @@ def _open_invoices(customer):
 @frappe.whitelist()
 def dues():
 	"""Customers who owe money, biggest first, with their open bills."""
-	_check_role()
+	_check_role(VIEWER_ROLES, _("Only sales, drivers and accounts staff can see customer dues"))
 	rows = frappe.get_all(
 		"Sales Invoice",
 		filters={"docstatus": 1, "outstanding_amount": [">", 0]},
@@ -65,7 +67,7 @@ def _account(company, mode):
 @frappe.whitelist()
 def collect(customer, amount, mode="Cash", reference=None):
 	"""Receive money and match it to the oldest unpaid bills first."""
-	_check_role()
+	_check_role(COLLECTOR_ROLES, _("Only drivers and accounts staff can collect payment"))
 	amount = flt(amount)
 	if amount <= 0:
 		frappe.throw(_("Enter the amount received"), PaymentError)
