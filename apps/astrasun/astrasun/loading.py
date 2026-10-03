@@ -94,6 +94,7 @@ def _task(dn):
 			{
 				"item_code": r.item_code,
 				"item_name": r.item_name,
+				"batch_no": r.batch_no,
 				"qty": flt(r.qty),
 				"rate": flt(r.rate),
 				"amount": flt(r.amount),
@@ -172,7 +173,10 @@ def start(sales_order, vehicle_no=None):
 
 @frappe.whitelist()
 def mark_loaded(name, vehicle_no, items=None):
-	"""Record the vehicle and the bags actually loaded; `items` is [{item_code, qty}]."""
+	"""Record the vehicle and the bags actually loaded; `items` is [{item_code, qty, batch_no}].
+
+	An item may appear more than once to take bags from several batches. The warehouse picks the batch;
+	nothing is chosen automatically."""
 	_check_role()
 	if not (vehicle_no or "").strip():
 		frappe.throw(_("Pick the vehicle"), LoadingError)
@@ -182,15 +186,7 @@ def mark_loaded(name, vehicle_no, items=None):
 	if dn.astrasun_change_status == CHANGE_REQUESTED or edit_waiting(dn.items[0].against_sales_order):
 		frappe.throw(_("A change is waiting for the owner"), LoadingError)
 	if items:
-		items = json.loads(items) if isinstance(items, str) else items
-		loaded = {row["item_code"]: flt(row["qty"]) for row in items}
-		ordered = {r.item_code: flt(r.qty) for r in dn.items}
-		for code, qty in loaded.items():
-			if code not in ordered or qty < 0 or qty > ordered[code]:
-				frappe.throw(_("Loaded quantity for {0} is more than ordered").format(code), LoadingError)
-		dn.items = [r for r in dn.items if loaded.get(r.item_code, 0) > 0]
-		for r in dn.items:
-			r.qty = loaded[r.item_code]
+		_apply_loaded(dn, json.loads(items) if isinstance(items, str) else items)
 	if not dn.items:
 		frappe.throw(_("Nothing was loaded"), LoadingError)
 	_assign_vehicle(dn, vehicle_no)
@@ -199,6 +195,78 @@ def mark_loaded(name, vehicle_no, items=None):
 	with _as_system():
 		dn.save()
 	return _task(dn)
+
+
+_ROW_KEYS = ("name", "idx", "creation", "modified", "modified_by", "owner", "docstatus", "parent")
+
+
+def _apply_loaded(dn, entries):
+	"""Replace the truck's rows by what was loaded, one row per (item, batch)."""
+	ordered = {r.item_code: flt(r.qty) for r in dn.items}
+	templates = {}
+	for r in dn.items:
+		templates.setdefault(r.item_code, {k: v for k, v in r.as_dict().items() if k not in _ROW_KEYS})
+	total = {}
+	for e in entries:
+		code, qty = e["item_code"], flt(e["qty"])
+		if code not in ordered or qty < 0:
+			frappe.throw(_("{0} is not on this order").format(code), LoadingError)
+		total[code] = total.get(code, 0) + qty
+	for code, qty in total.items():
+		if qty > ordered[code]:
+			frappe.throw(_("Loaded quantity for {0} is more than ordered").format(code), LoadingError)
+	warehouses = {r.item_code: r.warehouse for r in dn.items}
+	taken = {}
+	rows = []
+	for e in entries:
+		code, qty, batch = e["item_code"], flt(e["qty"]), (e.get("batch_no") or "").strip()
+		if qty <= 0:
+			continue
+		if batch:
+			if frappe.db.get_value("Batch", batch, "item") != code:
+				frappe.throw(_("Batch {0} is not a batch of {1}").format(batch, code), LoadingError)
+			key = (code, batch)
+			taken[key] = taken.get(key, 0) + qty
+			if taken[key] > _batch_stock(code, warehouses[code], batch):
+				frappe.throw(_("Batch {0} does not have {1} bags").format(batch, taken[key]), LoadingError)
+		rows.append(
+			{
+				**templates[code],
+				"qty": qty,
+				"batch_no": batch or None,
+				"use_serial_batch_fields": 1 if batch else 0,
+			}
+		)
+	dn.items = []
+	for row in rows:
+		dn.append("items", row)
+
+
+def _batch_stock(item_code, warehouse, batch_no):
+	from erpnext.stock.doctype.batch.batch import get_batch_qty
+
+	return sum(
+		flt(b.qty)
+		for b in get_batch_qty(item_code=item_code, warehouse=warehouse) or []
+		if b.batch_no == batch_no
+	)
+
+
+@frappe.whitelist()
+def batches(item_code):
+	"""The batches of a bag item with bags in stock, oldest first: the warehouse picks one."""
+	_check_role()
+	from erpnext.stock.doctype.batch.batch import get_batch_qty
+
+	warehouse = frappe.db.get_value("Item Default", {"parent": item_code}, "default_warehouse")
+	with _as_system():
+		stock = [b for b in get_batch_qty(item_code=item_code, warehouse=warehouse) or [] if b.qty > 0]
+		made = {b: frappe.db.get_value("Batch", b, "creation") for b in (s.batch_no for s in stock)}
+	stock.sort(key=lambda b: made[b.batch_no])
+	return {
+		"tracked": bool(frappe.db.get_value("Item", item_code, "has_batch_no")),
+		"batches": [{"batch_no": b.batch_no, "qty": flt(b.qty)} for b in stock],
+	}
 
 
 def _ordered(dn):
@@ -240,7 +308,7 @@ def request_change(name, items, reason):
 			)
 	if not any(qty > 0 for qty in wanted.values()):
 		frappe.throw(_("Nothing would be loaded. Ask the owner to cancel the order instead."), LoadingError)
-	if all(wanted.get(r.item_code, 0) == flt(r.qty) for r in dn.items) and len(wanted) == len(dn.items):
+	if wanted == _loaded_by_item(dn):
 		frappe.throw(_("These are the bags already loaded"), LoadingError)
 	dn.astrasun_change_status = CHANGE_REQUESTED
 	dn.astrasun_change_items = json.dumps(wanted)
@@ -249,6 +317,32 @@ def request_change(name, items, reason):
 	with _as_system():
 		dn.save()
 	return _task(dn)
+
+
+def _loaded_by_item(dn):
+	total = {}
+	for r in dn.items:
+		total[r.item_code] = total.get(r.item_code, 0) + flt(r.qty)
+	return total
+
+
+def _refit(dn, wanted):
+	"""Put the new bags per item on the rows, keeping the batches already chosen: the last rows give up
+	bags first, and extra bags go on the last row of the item."""
+	rows = []
+	left = {code: flt(qty) for code, qty in wanted.items()}
+	last = {}
+	for r in dn.items:
+		if flt(left.get(r.item_code, 0)) <= 0:
+			continue
+		r.qty = min(flt(r.qty), left[r.item_code])
+		left[r.item_code] -= r.qty
+		last[r.item_code] = r
+		rows.append(r)
+	for code, extra in left.items():
+		if extra > 0 and code in last:
+			last[code].qty += extra
+	dn.items = rows
 
 
 def _change_view(dn):
@@ -304,9 +398,7 @@ def decide_change(name, approve, note=None):
 				si.flags.change_reason = f"Load changed: {reason}"
 				si.cancel()
 				dn.astrasun_invoice = None
-			dn.items = [r for r in dn.items if flt(wanted.get(r.item_code, 0)) > 0]
-			for r in dn.items:
-				r.qty = flt(wanted[r.item_code])
+			_refit(dn, wanted)
 		dn.astrasun_change_status = None
 		dn.astrasun_change_items = None
 		dn.astrasun_change_by = None
