@@ -29,12 +29,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pick the vehicle'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('less-ATTA-50KG')));
-    await tester.pump();
-    expect(
-      tester.widget<Text>(find.byKey(const Key('qty-ATTA-50KG'))).data,
-      '39',
-    );
+    // No plus or minus: the warehouse loads what was ordered, or asks to change the order
+    expect(find.byKey(const Key('less-ATTA-50KG')), findsNothing);
+    expect(find.byKey(const Key('change-SAL-ORD-0000')), findsOneWidget);
     await tester.tap(find.byKey(const Key('vehicle-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('MP09AB1234 - Ramesh Driver').last);
@@ -46,6 +43,42 @@ void main() {
     expect(find.textContaining('MP09AB1234'), findsWidgets);
     // It stays on the warehouse's screen, now to print the bill
     expect(find.byKey(const Key('print-SAL-ORD-0000')), findsOneWidget);
+  });
+
+  testWidgets('a change while loading sends the order back to the owner', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await demoAs(tester, 'Mill Warehouse');
+    await tester.tap(find.text('Loading queue'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('start-SAL-ORD-0000')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('change-SAL-ORD-0000')));
+    await tester.pumpAndSettle();
+    // More than the order asks for is refused
+    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '99');
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const Key('change-reason')),
+        matching: find.byType(TextField),
+      ),
+      'Shop wants fewer',
+    );
+    await tester.tap(find.byKey(const Key('change-send')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('change-send')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '30');
+    await tester.tap(find.byKey(const Key('change-send')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('change-waiting-SAL-ORD-0000')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('loaded-SAL-ORD-0000')), findsNothing);
   });
 
   testWidgets('an order approved by the owner appears for the loader', (

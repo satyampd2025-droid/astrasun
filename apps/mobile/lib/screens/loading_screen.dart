@@ -142,36 +142,31 @@ class _TaskCardState extends State<_TaskCard> {
       widget.vehicles.any((v) => v.vehicleNo == widget.task.vehicleNo)
       ? widget.task.vehicleNo
       : null;
-  late final Map<String, int> _qty = {
-    for (final i in widget.task.items) i.itemCode: i.qty.round(),
-  };
   bool _missing = false;
 
   void _finish() {
-    final s = S.of(context);
     if (_vehicle == null) {
       setState(() => _missing = true);
       return;
     }
-    if (!_qty.values.any((q) => q > 0)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(s.t('Nothing to load'))));
-      return;
-    }
-    widget.onLoaded(_vehicle!, _qty);
+    widget.onLoaded(_vehicle!, {
+      for (final i in widget.task.items) i.itemCode: i.qty.round(),
+    });
   }
 
   /// After the bill is printed the bags can still change, with the owner's approval.
   Future<void> _askChange() async {
     final s = S.of(context);
-    final bags = {for (final i in widget.task.items) i.itemCode: i.qty.round()};
+    final fields = {
+      for (final i in widget.task.items)
+        i.itemCode: TextEditingController(text: '${i.qty.round()}'),
+    };
     final reason = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(
-          title: Text(s.t('Change quantity')),
+          title: Text(s.t('Change order')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -180,28 +175,16 @@ class _TaskCardState extends State<_TaskCard> {
                   Row(
                     children: [
                       Expanded(child: Text(i.itemName)),
-                      IconButton(
-                        key: Key('change-less-${i.itemCode}'),
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => setLocal(() {
-                          if (bags[i.itemCode]! > 0) {
-                            bags[i.itemCode] = bags[i.itemCode]! - 1;
-                          }
-                        }),
-                      ),
-                      Text(
-                        '${bags[i.itemCode]}',
-                        key: Key('change-qty-${i.itemCode}'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      IconButton(
-                        key: Key('change-more-${i.itemCode}'),
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: () => setLocal(
-                          () => bags[i.itemCode] = bags[i.itemCode]! + 1,
+                      SizedBox(
+                        width: 90,
+                        child: TextField(
+                          key: Key('change-qty-${i.itemCode}'),
+                          controller: fields[i.itemCode],
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            suffixText: '/ ${i.qty.round()}',
+                          ),
                         ),
                       ),
                     ],
@@ -214,7 +197,7 @@ class _TaskCardState extends State<_TaskCard> {
                 const SizedBox(height: 8),
                 Text(
                   s.t(
-                    'The owner has to approve. The printed bill is cancelled and you print a new one.',
+                    'The order goes back to the owner for approval. A printed bill is cancelled and you print a new one.',
                   ),
                   style: const TextStyle(fontSize: 13),
                 ),
@@ -229,7 +212,21 @@ class _TaskCardState extends State<_TaskCard> {
             FilledButton(
               key: const Key('change-send'),
               onPressed: () {
-                if (reason.text.trim().isNotEmpty) Navigator.pop(context, true);
+                final over = widget.task.items.any((i) {
+                  final q = int.tryParse(fields[i.itemCode]!.text.trim());
+                  return q == null || q < 0 || q > i.qty.round();
+                });
+                if (over) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        s.t('Bags cannot be more than the order asks for'),
+                      ),
+                    ),
+                  );
+                } else if (reason.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
               },
               child: Text(s.t('Send to the owner')),
             ),
@@ -237,7 +234,12 @@ class _TaskCardState extends State<_TaskCard> {
         ),
       ),
     );
-    if (ok == true) widget.onChange(bags, reason.text.trim());
+    if (ok == true) {
+      widget.onChange({
+        for (final i in widget.task.items)
+          i.itemCode: int.parse(fields[i.itemCode]!.text.trim()),
+      }, reason.text.trim());
+    }
   }
 
   @override
@@ -277,37 +279,13 @@ class _TaskCardState extends State<_TaskCard> {
                         style: const TextStyle(fontSize: 18),
                       ),
                     ),
-                    if (loading) ...[
-                      IconButton(
-                        key: Key('less-${i.itemCode}'),
-                        iconSize: 32,
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => setState(() {
-                          final q = _qty[i.itemCode]!;
-                          if (q > 0) _qty[i.itemCode] = q - 1;
-                        }),
+                    Text(
+                      '${i.qty.round()} ${s.t('bags')}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                       ),
-                      SizedBox(
-                        width: 48,
-                        child: Text(
-                          '${_qty[i.itemCode]}',
-                          key: Key('qty-${i.itemCode}'),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Text('/ ${i.qty.round()}'),
-                    ] else
-                      Text(
-                        '${i.qty.round()} ${s.t('bags')}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    ),
                   ],
                 ),
               ),
@@ -325,16 +303,7 @@ class _TaskCardState extends State<_TaskCard> {
                   '${s.t('Vehicle {0}', [t.vehicleNo!])}'
                   '${(t.driverName ?? '').isEmpty ? '' : ' - ${t.driverName}'}',
                 ),
-              if (t.changeRequested)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    s.t('Change waiting for the owner'),
-                    key: Key('change-waiting-${t.id}'),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                )
-              else ...[
+              if (!t.changeRequested) ...[
                 FilledButton.icon(
                   key: Key('print-${t.id}'),
                   icon: const Icon(Icons.print_outlined),
@@ -350,15 +319,25 @@ class _TaskCardState extends State<_TaskCard> {
                     onPressed: widget.onLeft,
                   ),
                 ],
-                TextButton.icon(
-                  key: Key('change-${t.id}'),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: Text(s.t('Change quantity')),
-                  onPressed: _askChange,
-                ),
               ],
             ],
-            if (loading) ...[
+            if ((loading || t.status == 'Loaded') && t.changeRequested)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  s.t('Change waiting for the owner'),
+                  key: Key('change-waiting-${t.id}'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              )
+            else if (loading || t.status == 'Loaded')
+              TextButton.icon(
+                key: Key('change-${t.id}'),
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(s.t('Change order')),
+                onPressed: _askChange,
+              ),
+            if (loading && !t.changeRequested) ...[
               if (widget.vehicles.isEmpty)
                 Text(
                   s.t('No vehicles yet. Ask the owner to add them.'),
