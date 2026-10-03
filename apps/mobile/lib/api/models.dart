@@ -173,6 +173,10 @@ class LoadingTask {
     required this.status,
     required this.items,
     this.vehicleNo,
+    this.driverName,
+    this.driverPhone,
+    this.address,
+    this.customerPhone,
     this.invoice,
     this.total = 0,
     this.ewayNeeded = false,
@@ -187,6 +191,10 @@ class LoadingTask {
     status: json['status'] as String,
     stage: json['stage'] as String?,
     vehicleNo: json['vehicle_no'] as String?,
+    driverName: json['driver_name'] as String?,
+    driverPhone: json['driver_phone'] as String?,
+    address: json['address'] as String?,
+    customerPhone: json['customer_phone'] as String?,
     invoice: json['invoice'] as String?,
     total: ((json['total'] as num?) ?? 0).toDouble(),
     ewayNeeded: (json['eway_bill_needed'] as bool?) ?? false,
@@ -197,7 +205,7 @@ class LoadingTask {
           itemCode: i['item_code'] as String,
           itemName: i['item_name'] as String,
           qty: (i['qty'] as num).toDouble(),
-          rate: 0,
+          rate: ((i['rate'] as num?) ?? 0).toDouble(),
         ),
     ],
   );
@@ -221,6 +229,14 @@ class LoadingTask {
         _ => status,
       };
   final String? vehicleNo;
+
+  /// The driver or contact person that goes with the vehicle.
+  final String? driverName;
+  final String? driverPhone;
+
+  /// Where to deliver and who to call there.
+  final String? address;
+  final String? customerPhone;
   final List<OrderItem> items;
 
   /// Set once the truck is billed (invoice before dispatch).
@@ -235,6 +251,8 @@ class LoadingTask {
     String? id,
     String? status,
     String? vehicleNo,
+    String? driverName,
+    String? driverPhone,
     List<OrderItem>? items,
     String? invoice,
     double? total,
@@ -247,12 +265,43 @@ class LoadingTask {
     status: status ?? this.status,
     stage: status == null ? _stage : null,
     vehicleNo: vehicleNo ?? this.vehicleNo,
+    driverName: driverName ?? this.driverName,
+    driverPhone: driverPhone ?? this.driverPhone,
+    address: address,
+    customerPhone: customerPhone,
     items: items ?? this.items,
     invoice: invoice ?? this.invoice,
     total: total ?? this.total,
     ewayNeeded: ewayNeeded ?? this.ewayNeeded,
     ewayBillNo: ewayBillNo ?? this.ewayBillNo,
   );
+}
+
+/// A truck the mill loads, with the driver who goes with it.
+class Vehicle {
+  const Vehicle({
+    required this.vehicleNo,
+    required this.driverName,
+    this.driverPhone,
+    this.driverUser,
+    this.enabled = true,
+  });
+
+  factory Vehicle.fromJson(Map<String, dynamic> j) => Vehicle(
+    vehicleNo: j['vehicle_no'] as String,
+    driverName: (j['driver_name'] as String?) ?? '',
+    driverPhone: j['driver_phone'] as String?,
+    driverUser: j['driver_user'] as String?,
+    enabled: (j['enabled'] as bool?) ?? true,
+  );
+
+  final String vehicleNo;
+  final String driverName;
+  final String? driverPhone;
+
+  /// The app login of the driver, if they have one.
+  final String? driverUser;
+  final bool enabled;
 }
 
 /// A customer who owes money, with the number of open bills.

@@ -5,7 +5,6 @@ import '../api/models.dart';
 import '../strings.dart';
 import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
-import '../widgets/voice_text_field.dart';
 
 /// Warehouse: approved orders to load onto trucks.
 class LoadingScreen extends StatefulWidget {
@@ -18,6 +17,20 @@ class LoadingScreen extends StatefulWidget {
 
 class _LoadingScreenState extends State<LoadingScreen> {
   late Future<List<LoadingTask>> _tasks = widget.client.loadingQueue();
+  List<Vehicle> _vehicles = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    // The list is only needed once a load is marked done; if it cannot be
+    // fetched the card says so instead of offering a vehicle.
+    widget.client
+        .vehicles()
+        .then((v) {
+          if (mounted) setState(() => _vehicles = v);
+        })
+        .catchError((_) {});
+  }
 
   void _reload() {
     setState(() {
@@ -45,9 +58,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
         );
       }
     } on Exception catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(s.saveFailed(e))),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
     }
     _reload();
   }
@@ -70,6 +81,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
             _TaskCard(
               key: ValueKey('${t.id}-${t.status}'),
               task: t,
+              vehicles: _vehicles,
               onStart: () => _run(() => widget.client.startLoading(t)),
               onLoaded: (vehicle, loaded) =>
                   _run(() => widget.client.markLoaded(t, vehicle, loaded)),
@@ -84,10 +96,12 @@ class _TaskCard extends StatefulWidget {
   const _TaskCard({
     super.key,
     required this.task,
+    required this.vehicles,
     required this.onStart,
     required this.onLoaded,
   });
   final LoadingTask task;
+  final List<Vehicle> vehicles;
   final VoidCallback onStart;
   final void Function(String vehicle, Map<String, int> loaded) onLoaded;
 
@@ -96,7 +110,10 @@ class _TaskCard extends StatefulWidget {
 }
 
 class _TaskCardState extends State<_TaskCard> {
-  late final _vehicle = TextEditingController(text: widget.task.vehicleNo);
+  late String? _vehicle =
+      widget.vehicles.any((v) => v.vehicleNo == widget.task.vehicleNo)
+      ? widget.task.vehicleNo
+      : null;
   late final Map<String, int> _qty = {
     for (final i in widget.task.items) i.itemCode: i.qty.round(),
   };
@@ -104,7 +121,7 @@ class _TaskCardState extends State<_TaskCard> {
 
   void _finish() {
     final s = S.of(context);
-    if (_vehicle.text.trim().isEmpty) {
+    if (_vehicle == null) {
       setState(() => _missing = true);
       return;
     }
@@ -114,7 +131,7 @@ class _TaskCardState extends State<_TaskCard> {
       ).showSnackBar(SnackBar(content: Text(s.t('Nothing to load'))));
       return;
     }
-    widget.onLoaded(_vehicle.text.trim(), _qty);
+    widget.onLoaded(_vehicle!, _qty);
   }
 
   @override
@@ -197,16 +214,47 @@ class _TaskCardState extends State<_TaskCard> {
                 onPressed: widget.onStart,
               ),
             if (loading) ...[
-              VoiceTextField(
-                key: Key('vehicle-${t.id}'),
-                controller: _vehicle,
-                label: s.t('Vehicle number'),
-              ),
+              if (widget.vehicles.isEmpty)
+                Text(
+                  s.t('No vehicles yet. Ask the owner to add them.'),
+                  key: Key('no-vehicles-${t.id}'),
+                )
+              else ...[
+                DropdownButtonFormField<String>(
+                  key: Key('vehicle-${t.id}'),
+                  initialValue: _vehicle,
+                  isExpanded: true,
+                  decoration: InputDecoration(labelText: s.t('Vehicle')),
+                  items: [
+                    for (final v in widget.vehicles)
+                      DropdownMenuItem(
+                        value: v.vehicleNo,
+                        child: Text('${v.vehicleNo} - ${v.driverName}'),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() {
+                    _vehicle = v;
+                    _missing = false;
+                  }),
+                ),
+                if (_vehicle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      s.t('Driver {0}', [
+                        widget.vehicles
+                            .firstWhere((v) => v.vehicleNo == _vehicle)
+                            .driverName,
+                      ]),
+                      key: Key('driver-${t.id}'),
+                    ),
+                  ),
+              ],
               if (_missing)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    s.t('Enter the vehicle number'),
+                    s.t('Pick the vehicle'),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                     ),

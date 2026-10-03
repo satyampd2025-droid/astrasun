@@ -16,6 +16,7 @@ const Map<String, List<Task>> roleTasks = {
     Task('All orders', Icons.list_alt_outlined, 2),
     Task('Today at the mill', Icons.dashboard_outlined, 5),
     Task('Customer dues', Icons.account_balance_wallet_outlined, 2),
+    Task('Vehicles', Icons.local_shipping_outlined, 2),
     Task('Alerts', Icons.notifications_active_outlined, 5),
     Task('Reports', Icons.bar_chart, 5),
   ],
@@ -24,6 +25,7 @@ const Map<String, List<Task>> roleTasks = {
     Task('All orders', Icons.list_alt_outlined, 2),
     Task('Plan production', Icons.event_note_outlined, 4),
     Task('Trucks at the mill', Icons.local_shipping_outlined, 3),
+    Task('Vehicles', Icons.airport_shuttle_outlined, 2),
     Task('Stock', Icons.inventory_2_outlined, 2),
   ],
   'Mill Sales': [

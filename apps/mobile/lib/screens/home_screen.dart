@@ -16,6 +16,7 @@ import 'order_list_screen.dart';
 import 'production_screens.dart';
 import 'reports_screen.dart';
 import 'trucks_screen.dart';
+import 'vehicles_screen.dart';
 import 'wheat_screens.dart';
 
 /// "What I need to do now" for the user's mill roles: a tiles dashboard for
@@ -83,14 +84,22 @@ class HomeScreen extends StatelessWidget {
               _TileGrid(tasks: tasks, client: client, collect: collect),
             ] else ...[
               _SectionTitle(s.t('Next for you')),
-              _NextStepCard(task: tasks.first, client: client, collect: collect),
+              _NextStepCard(
+                task: tasks.first,
+                client: client,
+                collect: collect,
+              ),
               if (tasks.length > 1) ...[
                 const SizedBox(height: 24),
                 _SectionTitle(s.t('More work')),
                 for (final task in tasks.skip(1))
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: _TaskRow(task: task, client: client, collect: collect),
+                    child: _TaskRow(
+                      task: task,
+                      client: client,
+                      collect: collect,
+                    ),
                   ),
               ],
             ],
@@ -108,9 +117,9 @@ void _open(
   bool collect,
 ) {
   final s = S.of(context);
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute(builder: (_) => _screenFor(task, client, s, collect)));
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => _screenFor(task, client, s, collect)),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -282,13 +291,15 @@ Widget _screenFor(Task task, ErpNextClient client, S s, bool collect) =>
       'All orders' => AllOrdersScreen(client: client),
       'Approve orders' => ApprovalsScreen(client: client),
       'Loading queue' => LoadingScreen(client: client),
-      'Bills and payments' => TrucksScreen(client: client, mode: TruckMode.invoice),
+      'Bills and payments' => TrucksScreen(
+        client: client,
+        mode: TruckMode.invoice,
+      ),
       'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
       'My deliveries' => DeliveriesScreen(client: client),
-      'Collect payment' || 'Customer dues' => DuesScreen(
-        client: client,
-        canCollect: collect,
-      ),
+      'Vehicles' => VehiclesScreen(client: client),
+      'Collect payment' ||
+      'Customer dues' => DuesScreen(client: client, canCollect: collect),
       'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),
       'Weighbridge' => WeighbridgeScreen(client: client),
       'Check wheat lot' => LabScreen(client: client),

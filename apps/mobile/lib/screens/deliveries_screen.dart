@@ -7,7 +7,8 @@ import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
-/// Driver: trucks on the road. Confirm each one with the receiver's name.
+/// Driver: every order on their vehicle, from loading until delivered, with
+/// where it goes and what is in it. Confirm each delivery with the receiver's name.
 class DeliveriesScreen extends StatefulWidget {
   const DeliveriesScreen({super.key, required this.client});
   final ErpNextClient client;
@@ -57,12 +58,15 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         SnackBar(content: Text(s.t('Delivered to {0}', [name]))),
       );
     } on Exception catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(s.saveFailed(e))),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
     }
     _reload();
   }
+
+  /// The bill total once billed, else what the items add up to.
+  double _total(LoadingTask t) => t.total > 0
+      ? t.total
+      : t.items.fold(0.0, (sum, i) => sum + i.qty * i.rate);
 
   void _reload() {
     setState(() {
@@ -110,19 +114,86 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                       ],
                     ),
                     Text(s.t('Vehicle {0}', [t.vehicleNo ?? '-'])),
+                    if ((t.address ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.place_outlined, size: 20),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                t.address!,
+                                key: Key('address-${t.id}'),
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if ((t.customerPhone ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.call_outlined, size: 20),
+                            const SizedBox(width: 6),
+                            Text(
+                              t.customerPhone!,
+                              key: Key('phone-${t.id}'),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 8),
+                    Text(t.salesOrder, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(height: 4),
                     for (final i in t.items)
-                      Text(
-                        '${i.itemName}: ${i.qty.round()} ${s.t('bags')}',
-                        style: const TextStyle(fontSize: 18),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${i.itemName}: ${i.qty.round()} ${s.t('bags')}',
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                            ),
+                            if (i.rate > 0)
+                              Text(
+                                'Rs ${(i.qty * i.rate).round()}',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                          ],
+                        ),
+                      ),
+                    if (t.total > 0 || t.items.any((i) => i.rate > 0))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          '${s.t('Total')}: Rs ${_total(t).round()}',
+                          key: Key('total-${t.id}'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     const SizedBox(height: 12),
-                    FilledButton.icon(
-                      key: Key('deliver-${t.id}'),
-                      icon: const Icon(Icons.verified_outlined),
-                      label: Text(s.t('Confirm delivery')),
-                      onPressed: () => _deliver(t),
-                    ),
+                    if (t.status == 'Dispatched')
+                      FilledButton.icon(
+                        key: Key('deliver-${t.id}'),
+                        icon: const Icon(Icons.verified_outlined),
+                        label: Text(s.t('Confirm delivery')),
+                        onPressed: () => _deliver(t),
+                      )
+                    else
+                      Text(
+                        s.t('Waiting for the truck to leave'),
+                        key: Key('not-left-${t.id}'),
+                      ),
                   ],
                 ),
               ),
