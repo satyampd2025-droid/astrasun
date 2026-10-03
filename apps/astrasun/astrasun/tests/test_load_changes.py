@@ -30,15 +30,8 @@ class TestLoadChanges(MillFixture):
 		frappe.set_user("Administrator")
 		self.assertIn(_inv, frappe.get_print("Sales Invoice", _inv))
 		frappe.set_user(self.loader)
-		frappe.local.conf.host_name = "http://localhost:8000"
-		try:
-			invoicing.bill_pdf(dn)
-		except (OSError, frappe.ValidationError):
-			# This test server has no web server in front for the print styles and logo, so wkhtmltopdf
-			# cannot fetch them; the PDF itself is checked on the real server.
-			pass
-		else:
-			self.assertTrue(frappe.local.response.filecontent.startswith(b"%PDF"))
+		invoicing.bill_pdf(dn)
+		self.assertTrue(frappe.local.response.filecontent.startswith(b"%PDF"))
 		frappe.set_user(self.rep)
 		with self.assertRaises(frappe.PermissionError):
 			invoicing.bill_pdf(dn)

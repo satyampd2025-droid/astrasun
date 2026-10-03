@@ -5,9 +5,12 @@ Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
 which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
+from frappe.utils.pdf import get_pdf
 
 from astrasun import audit
 from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
@@ -115,7 +118,10 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		pdf = frappe.get_print("Sales Invoice", invoice_name, as_pdf=True)
+		# The PDF tool runs inside the server and cannot always fetch pictures (logo, stamps) by their
+		# web address, which fails the whole bill; the bill goes out as text without them.
+		html = frappe.get_print("Sales Invoice", invoice_name, no_letterhead=1)
+		pdf = get_pdf(re.sub(r"<img\b[^>]*>", "", html, flags=re.I))
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"
