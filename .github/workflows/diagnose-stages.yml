@@ -10,7 +10,7 @@ on:
     inputs:
       modules:
         description: "Test modules to run, space separated"
-        default: "test_acceptance test_edit_order test_api test_audit test_dashboard test_delivery_payments test_invoicing test_load_changes test_loading test_milling test_order_stages test_orders test_packing test_setup test_receipts test_stages test_vehicles test_wheat"
+        default: "\1 test_edit_order test_api test_audit test_dashboard test_delivery_payments test_invoicing test_load_changes test_loading test_milling test_order_stages test_orders test_packing test_setup test_receipts test_stages test_vehicles test_wheat"
 
 concurrency:
   group: diagnose-stages
@@ -18,7 +18,7 @@ concurrency:
 
 env:
   ADMIN_PASSWORD: ci-admin-pass-1
-  MODULES: ${{ github.event.inputs.modules || 'test_acceptance test_edit_order test_api test_audit test_dashboard test_delivery_payments test_invoicing test_load_changes test_loading test_milling test_order_stages test_orders test_packing test_setup test_receipts test_stages test_vehicles test_wheat' }}
+  MODULES: ${{ github.event.inputs.modules || 'test_edit_order test_stages' }}
 
 jobs:
   stages:
@@ -60,6 +60,11 @@ jobs:
           .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.defaults.get_global_default --args '("company",)'
           .github/diagnose/stack.sh in backend bench --site mill.localhost execute frappe.db.get_single_value --args '("Global Defaults","default_company")'
           .github/diagnose/stack.sh in backend bash -c 'cd /home/frappe/frappe-bench/apps && grep -n "before_tests" */*/hooks.py; for f in $(grep -rl "def before_tests" --include=*.py .); do echo "== $f"; grep -n -A25 "def before_tests" $f; done; echo "== who sets a default company"; grep -rn "set_global_default\|set_default(.company" --include=*.py erpnext/erpnext/setup/utils.py india_compliance/india_compliance/tests 2>/dev/null | head -20'
+
+      - name: Where ERPNext keeps update_child_qty_and_rate
+        if: always()
+        run: |
+          .github/diagnose/stack.sh in backend bash -c 'cd /home/frappe/frappe-bench/apps/erpnext && grep -rn "update_child_qty_and_rate" --include=*.py --include=*.js . | grep -v test | head -12'
 
       - name: What the tests left behind in the mill's masters
         if: always()
