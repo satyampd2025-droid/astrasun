@@ -252,7 +252,6 @@ def _approve_edit(doc, note):
 	"""Put the edited items on the approved order, taking back any bill and load made from the old ones."""
 	payload = json.loads(doc.astrasun_edit_json)
 	reason = doc.astrasun_edit_note
-	existing = {r.item_code: r for r in doc.items}
 	with _as_system():
 		for name in frappe.get_all(
 			"Delivery Note Item",
@@ -267,33 +266,44 @@ def _approve_edit(doc, note):
 				si.cancel()
 				dn.db_set("astrasun_invoice", None)
 			frappe.delete_doc("Delivery Note", name, force=1, ignore_permissions=True)
-		from erpnext.controllers.accounts_controller import update_child_qty_and_rate
-
-		rows = [
-			{
-				"docname": existing[i["item_code"]].name if i["item_code"] in existing else None,
-				"item_code": i["item_code"],
-				"qty": flt(i["qty"]),
-				"rate": flt(i["rate"]),
-				"delivery_date": payload.get("delivery_date") or str(doc.delivery_date),
-				"uom": frappe.db.get_value("Item", i["item_code"], "stock_uom"),
-				"conversion_factor": 1,
-			}
-			for i in payload["items"]
-		]
-		update_child_qty_and_rate("Sales Order", json.dumps(rows), doc.name)
-		doc.reload()
-		if payload.get("delivery_date"):
-			doc.db_set("delivery_date", payload["delivery_date"], update_modified=False)
-		_check(doc)
-		doc.astrasun_approved_by = frappe.session.user
-		doc.astrasun_approval_note = note
-		doc.astrasun_edit_json = None
-		doc.astrasun_edit_note = None
-		doc.astrasun_edit_by = None
-		doc.save()
+		# ERPNext's own way to change a submitted order is to cancel it and amend it: the amended
+		# copy carries the old number with a suffix, and the old order stays on record.
+		old_name, submitted_by, remarks, owner = (
+			doc.name,
+			doc.astrasun_submitted_by,
+			doc.astrasun_remarks,
+			doc.owner,
+		)
+		doc.flags.change_reason = f"Order edited: {reason}"
+		doc.cancel()
+		date = payload.get("delivery_date") or str(doc.delivery_date)
+		new = frappe.copy_doc(doc)
+		new.amended_from = old_name
+		new.items = []
+		for row in payload["items"]:
+			new.append(
+				"items",
+				{
+					"item_code": row["item_code"],
+					"qty": flt(row["qty"]),
+					"rate": flt(row["rate"]),
+					"delivery_date": date,
+					"warehouse": _warehouse(row["item_code"], new.company),
+				},
+			)
+		new.delivery_date = date
+		new.astrasun_approval_status = APPROVED
+		new.astrasun_submitted_by = submitted_by
+		new.astrasun_remarks = remarks
+		new.astrasun_approved_by = frappe.session.user
+		new.astrasun_approval_note = note
+		new.insert()
+		_check(new)
+		new.save()
+		new.submit()
+		new.db_set("owner", owner, update_modified=False)
+		doc = new
 	audit.log(doc, "Approval", f"Edit approved: {reason}" + (f" ({note})" if note else ""))
-	doc.reload()
 	return summary(doc)
 
 
