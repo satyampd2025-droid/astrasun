@@ -18,7 +18,7 @@ concurrency:
 
 env:
   ADMIN_PASSWORD: ci-admin-pass-1
-  MODULES: ${{ github.event.inputs.modules || 'test_invoicing test_load_changes' }}
+  MODULES: ${{ github.event.inputs.modules || 'test_invoicing test_load_changes test_loading test_order_stages test_edit_order test_acceptance' }}
 
 jobs:
   stages:
