@@ -1,8 +1,8 @@
 """Invoice before dispatch (DECISIONS D5).
 
-A loaded truck is billed from what was actually loaded. For consignments over
-Rs 50,000 the e-way bill number must be recorded too. Only then can the truck
-leave: dispatch submits the Delivery Note, which moves the stock out.
+A loaded truck is billed from what was actually loaded, when the warehouse taps
+Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
+which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
 import frappe
@@ -10,14 +10,11 @@ from frappe import _
 from frappe.utils import flt, nowdate
 
 from astrasun import audit
-from astrasun.loading import LOADED, _as_system, _task
+from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 
-BILLER_ROLES = ("Mill Accounts", "Mill Manager", "Mill Owner")
-DISPATCH_ROLES = ("Mill Dispatch", "Mill Manager", "Mill Owner")
+BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
+DISPATCH_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 DISPATCHED = "Dispatched"
-
-# Goods worth more than this need an e-way bill to move by road
-EWAY_BILL_LIMIT = 50000
 
 
 class InvoicingError(frappe.ValidationError):
@@ -38,9 +35,8 @@ def _view(dn):
 			"invoice_total": flt(frappe.db.get_value("Sales Invoice", invoice, "grand_total"))
 			if invoice
 			else 0,
-			"eway_bill_no": dn.astrasun_eway_bill_no,
-			"eway_bill_needed": flt(dn.grand_total) > EWAY_BILL_LIMIT,
 			"total": flt(dn.grand_total),
+			"change_requested": dn.astrasun_change_status == CHANGE_REQUESTED,
 		}
 	)
 	return task
@@ -73,9 +69,9 @@ def to_dispatch():
 
 
 @frappe.whitelist()
-def invoice(name, eway_bill_no=None):
-	"""Bill a loaded truck from the bags actually loaded."""
-	_require(BILLER_ROLES, "Only accounts staff can invoice")
+def invoice(name):
+	"""Print bill: bill a loaded truck from the bags actually loaded."""
+	_require(BILLER_ROLES, "Only the warehouse or accounts staff can bill a truck")
 	from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 
 	dn = frappe.get_doc("Delivery Note", name)
@@ -83,9 +79,8 @@ def invoice(name, eway_bill_no=None):
 		frappe.throw(_("Only a loaded truck can be invoiced"), InvoicingError)
 	if dn.astrasun_invoice:
 		frappe.throw(_("This truck is already invoiced"), InvoicingError)
-	eway = (eway_bill_no or "").strip()
-	if flt(dn.grand_total) > EWAY_BILL_LIMIT and not eway:
-		frappe.throw(_("An e-way bill number is needed for this much goods"), InvoicingError)
+	if dn.astrasun_change_status == CHANGE_REQUESTED:
+		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 
 	loaded = {r.so_detail: flt(r.qty) for r in dn.items}
 	sales_order = dn.items[0].against_sales_order
@@ -100,23 +95,36 @@ def invoice(name, eway_bill_no=None):
 		si.insert()
 		si.submit()
 		dn.astrasun_invoice = si.name
-		dn.astrasun_eway_bill_no = eway or None
 		dn.save()
 	audit.log(si, "Approval", f"Invoiced truck {dn.astrasun_vehicle_no} ({dn.name})")
 	return _view(dn)
 
 
 @frappe.whitelist()
+def bill_pdf(name):
+	"""The truck's bill as a PDF, for the phone to print."""
+	_require((*BILLER_ROLES, *DISPATCH_ROLES), "Only the warehouse or accounts staff can print bills")
+	invoice_name = frappe.db.get_value("Delivery Note", name, "astrasun_invoice")
+	if not invoice_name:
+		frappe.throw(_("This truck has no bill yet"), InvoicingError)
+	with _as_system():
+		pdf = frappe.get_print("Sales Invoice", invoice_name, as_pdf=True)
+	frappe.local.response.filename = f"{invoice_name}.pdf"
+	frappe.local.response.filecontent = pdf
+	frappe.local.response.type = "pdf"
+
+
+@frappe.whitelist()
 def dispatch(name):
-	"""Let the truck leave. Needs an invoice (and an e-way bill for big loads)."""
+	"""Let the truck leave. Needs an invoice."""
 	_require(DISPATCH_ROLES, "Only dispatch staff can send trucks")
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADED:
 		frappe.throw(_("This truck is not ready to leave"), InvoicingError)
 	if not dn.astrasun_invoice:
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
-	if flt(dn.grand_total) > EWAY_BILL_LIMIT and not dn.astrasun_eway_bill_no:
-		frappe.throw(_("The truck cannot leave without an e-way bill"), InvoicingError)
+	if dn.astrasun_change_status == CHANGE_REQUESTED:
+		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 	with _as_system():
 		dn.astrasun_loading_status = DISPATCHED
 		dn.save()

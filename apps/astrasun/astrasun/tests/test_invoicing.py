@@ -45,25 +45,24 @@ class TestInvoicing(MillFixture):
 			invoicing.dispatch(dn)
 		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "docstatus"), 0)
 
-	def test_big_load_needs_eway_bill(self):
+	def test_warehouse_prints_the_bill_and_a_big_load_needs_no_eway_bill(self):
+		"""The e-way bill is left to v2: no number is asked for, whatever the load is worth."""
 		_, dn = self._loaded(qty=40)  # 40 x 1500 = 60,000
-		frappe.set_user(self.accounts)
-		with self.assertRaises(invoicing.InvoicingError):
-			invoicing.invoice(dn)
-		view = invoicing.invoice(dn, "271000123456")
-		self.assertTrue(view["eway_bill_needed"])
-		self.assertEqual(view["eway_bill_no"], "271000123456")
-		frappe.set_user(self.dispatcher)
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")
+		frappe.set_user(self.loader)
+		view = invoicing.invoice(dn)
+		self.assertTrue(view["invoice"])
+		self.assertNotIn("eway_bill_needed", view)
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")  # the warehouse sends it too
 
 	def test_cannot_invoice_twice_and_roles_enforced(self):
 		_, dn = self._loaded()
-		frappe.set_user(self.loader)
+		frappe.set_user(self.rep)
 		with self.assertRaises(frappe.PermissionError):
 			invoicing.invoice(dn)
-		frappe.set_user(self.accounts)
+		frappe.set_user(self.loader)
 		invoicing.invoice(dn)
 		with self.assertRaises(invoicing.InvoicingError):
 			invoicing.invoice(dn)
+		frappe.set_user(self.accounts)
 		with self.assertRaises(frappe.PermissionError):
-			invoicing.dispatch(dn)
+			invoicing.dispatch(dn)  # accounts bill, they do not send trucks

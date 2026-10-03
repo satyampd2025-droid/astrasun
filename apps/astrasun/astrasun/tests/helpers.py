@@ -118,7 +118,7 @@ class MillFixture(FrappeTestCase):
 		task = loading.start(order["name"])
 		loading.mark_loaded(task["name"], "MP09AB1234", [{"item_code": ITEM, "qty": qty}])
 		frappe.set_user(accounts)
-		view = invoicing.invoice(task["name"], "271000123456")
+		view = invoicing.invoice(task["name"])
 		frappe.set_user(dispatcher)
 		invoicing.dispatch(task["name"])
 		return customer, task["name"], view["invoice"]

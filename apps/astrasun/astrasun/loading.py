@@ -15,10 +15,12 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from astrasun import stages, vehicles
+from astrasun import audit, stages, vehicles
 
 LOADER_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 LOADING, LOADED = "Loading", "Loaded"
+CHANGE_REQUESTED = "Requested"
+APPROVER_ROLES = ("Mill Manager", "Mill Owner")
 
 
 @contextmanager
@@ -79,6 +81,8 @@ def _task(dn):
 		"address": _address(dn),
 		"customer_phone": _phone(dn),
 		"loaded_by": dn.astrasun_loaded_by,
+		"invoice": dn.astrasun_invoice,
+		"change_requested": dn.astrasun_change_status == CHANGE_REQUESTED,
 		"items": [
 			{
 				"item_code": r.item_code,
@@ -141,9 +145,7 @@ def start(sales_order, vehicle_no=None):
 	so = frappe.get_doc("Sales Order", sales_order)
 	if so.docstatus != 1 or so.astrasun_approval_status != "Approved":
 		frappe.throw(_("Only approved orders can be loaded"), LoadingError)
-	if frappe.db.exists(
-		"Delivery Note Item", {"against_sales_order": sales_order, "docstatus": 0}
-	):
+	if frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order, "docstatus": 0}):
 		frappe.throw(_("This order is already being loaded"), LoadingError)
 	# Warehouse staff cannot read accounts, which ERPNext needs to fill in the note.
 	# Our own role check above is what allows this.
@@ -184,4 +186,119 @@ def mark_loaded(name, vehicle_no, items=None):
 	dn.astrasun_loaded_by = frappe.session.user
 	with _as_system():
 		dn.save()
+	return _task(dn)
+
+
+def _ordered(dn):
+	"""Bags the order asks for, by item: a load can be changed up to this, not beyond."""
+	return {
+		r.item_code: flt(r.qty)
+		for r in frappe.get_all(
+			"Sales Order Item",
+			filters={"parent": dn.items[0].against_sales_order},
+			fields=["item_code", "qty"],
+		)
+	}
+
+
+@frappe.whitelist()
+def request_change(name, items, reason):
+	"""After the bill is printed the load changed: the warehouse asks the owner to approve new bags.
+
+	`items` is [{item_code, qty}] with the new bags for each item (0 takes an item off).
+	Nothing changes until the owner approves; the truck cannot leave meanwhile.
+	"""
+	_check_role()
+	reason = (reason or "").strip()
+	if not reason:
+		frappe.throw(_("Give a reason for the change"), LoadingError)
+	dn = frappe.get_doc("Delivery Note", name)
+	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADED:
+		frappe.throw(_("Only a loaded truck that has not left can be changed"), LoadingError)
+	if dn.astrasun_change_status == CHANGE_REQUESTED:
+		frappe.throw(_("A change is already waiting for the owner"), LoadingError)
+	items = json.loads(items) if isinstance(items, str) else items
+	wanted = {row["item_code"]: flt(row["qty"]) for row in items}
+	ordered = _ordered(dn)
+	for code, qty in wanted.items():
+		if code not in ordered or qty < 0 or qty > ordered[code]:
+			frappe.throw(
+				_("{0}: more than the order asks for. Ask the rep to book another order.").format(code),
+				LoadingError,
+			)
+	if not any(qty > 0 for qty in wanted.values()):
+		frappe.throw(_("Nothing would be loaded. Ask the owner to cancel the order instead."), LoadingError)
+	if all(wanted.get(r.item_code, 0) == flt(r.qty) for r in dn.items) and len(wanted) == len(dn.items):
+		frappe.throw(_("These are the bags already loaded"), LoadingError)
+	dn.astrasun_change_status = CHANGE_REQUESTED
+	dn.astrasun_change_items = json.dumps(wanted)
+	dn.astrasun_change_note = reason
+	dn.astrasun_change_by = frappe.session.user
+	with _as_system():
+		dn.save()
+	return _task(dn)
+
+
+def _change_view(dn):
+	task = _task(dn)
+	task.update(
+		{
+			"new_items": [
+				{"item_code": code, "qty": qty}
+				for code, qty in json.loads(dn.astrasun_change_items or "{}").items()
+			],
+			"reason": dn.astrasun_change_note,
+			"asked_by": dn.astrasun_change_by,
+			"invoice": dn.astrasun_invoice,
+		}
+	)
+	return task
+
+
+@frappe.whitelist()
+def change_requests():
+	"""Load changes waiting for the owner or manager."""
+	if not set(frappe.get_roles()).intersection(APPROVER_ROLES):
+		frappe.throw(_("Only the owner or a manager can decide on load changes"), frappe.PermissionError)
+	names = frappe.get_all(
+		"Delivery Note",
+		filters={"docstatus": 0, "astrasun_change_status": CHANGE_REQUESTED},
+		order_by="modified asc",
+		pluck="name",
+	)
+	return [_change_view(frappe.get_doc("Delivery Note", n)) for n in names]
+
+
+@frappe.whitelist()
+def decide_change(name, approve, note=None):
+	"""Approve or turn down a load change.
+
+	Approving puts the new bags on the load and cancels the bill already printed; the warehouse
+	then taps Print bill again for the new one. Turning it down leaves the load and bill as they are.
+	"""
+	if not set(frappe.get_roles()).intersection(APPROVER_ROLES):
+		frappe.throw(_("Only the owner or a manager can decide on load changes"), frappe.PermissionError)
+	dn = frappe.get_doc("Delivery Note", name)
+	if dn.docstatus != 0 or dn.astrasun_change_status != CHANGE_REQUESTED:
+		frappe.throw(_("There is no change waiting on this truck"), LoadingError)
+	wanted = json.loads(dn.astrasun_change_items or "{}")
+	decision = "approved" if int(approve) else "turned down"
+	old_invoice = dn.astrasun_invoice
+	reason = dn.astrasun_change_note
+	with _as_system():
+		if int(approve):
+			if old_invoice:
+				si = frappe.get_doc("Sales Invoice", old_invoice)
+				si.flags.change_reason = f"Load changed: {reason}"
+				si.cancel()
+				dn.astrasun_invoice = None
+			dn.items = [r for r in dn.items if flt(wanted.get(r.item_code, 0)) > 0]
+			for r in dn.items:
+				r.qty = flt(wanted[r.item_code])
+		dn.astrasun_change_status = None
+		dn.astrasun_change_items = None
+		dn.astrasun_change_by = None
+		dn.astrasun_change_note = None
+		dn.save()
+	audit.log(dn, "Approval", f"Load change {decision}: {reason}" + (f" ({note})" if note else ""))
 	return _task(dn)
