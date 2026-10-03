@@ -64,40 +64,9 @@ def _account(company, mode):
 	return account
 
 
-@frappe.whitelist()
-def collect(customer, amount, mode="Cash", reference=None):
-	"""Receive money and match it to the oldest unpaid bills first."""
-	_check_role(COLLECTOR_ROLES, _("Only drivers and accounts staff can collect payment"))
-	amount = flt(amount)
-	if amount <= 0:
-		frappe.throw(_("Enter the amount received"), PaymentError)
-	if mode not in MODES:
-		frappe.throw(_("Payment mode must be Cash or Bank"), PaymentError)
-	invoices = _open_invoices(customer)
-	if not invoices:
-		frappe.throw(_("This customer has nothing to pay"), PaymentError)
-	due = sum(flt(i.outstanding_amount) for i in invoices)
-	if amount > due:
-		frappe.throw(_("More than the customer owes ({0})").format(due), PaymentError)
-	if mode == "Bank" and not (reference or "").strip():
-		frappe.throw(_("Enter the UTR or cheque number"), PaymentError)
-
-	company = invoices[0].company
+def receive(company, customer, amount, mode, reference, refs):
+	"""Book money received from `customer` against the bills in `refs` (a Payment Entry)."""
 	from erpnext.accounts.party import get_party_account
-
-	left, refs = amount, []
-	for inv in invoices:
-		if left <= 0:
-			break
-		part = min(left, flt(inv.outstanding_amount))
-		refs.append(
-			{
-				"reference_doctype": "Sales Invoice",
-				"reference_name": inv.name,
-				"allocated_amount": part,
-			}
-		)
-		left -= part
 
 	user = frappe.session.user
 	frappe.set_user("Administrator")
@@ -125,6 +94,43 @@ def collect(customer, amount, mode="Cash", reference=None):
 		pe.db_set("owner", user, update_modified=False)
 	finally:
 		frappe.set_user(user)
+	return pe
+
+
+@frappe.whitelist()
+def collect(customer, amount, mode="Cash", reference=None):
+	"""Receive money and match it to the oldest unpaid bills first."""
+	_check_role(COLLECTOR_ROLES, _("Only drivers and accounts staff can collect payment"))
+	amount = flt(amount)
+	if amount <= 0:
+		frappe.throw(_("Enter the amount received"), PaymentError)
+	if mode not in MODES:
+		frappe.throw(_("Payment mode must be Cash or Bank"), PaymentError)
+	invoices = _open_invoices(customer)
+	if not invoices:
+		frappe.throw(_("This customer has nothing to pay"), PaymentError)
+	due = sum(flt(i.outstanding_amount) for i in invoices)
+	if amount > due:
+		frappe.throw(_("More than the customer owes ({0})").format(due), PaymentError)
+	if mode == "Bank" and not (reference or "").strip():
+		frappe.throw(_("Enter the UTR or cheque number"), PaymentError)
+
+	company = invoices[0].company
+	left, refs = amount, []
+	for inv in invoices:
+		if left <= 0:
+			break
+		part = min(left, flt(inv.outstanding_amount))
+		refs.append(
+			{
+				"reference_doctype": "Sales Invoice",
+				"reference_name": inv.name,
+				"allocated_amount": part,
+			}
+		)
+		left -= part
+
+	pe = receive(company, customer, amount, mode, reference, refs)
 	return {
 		"payment": pe.name,
 		"amount": amount,
