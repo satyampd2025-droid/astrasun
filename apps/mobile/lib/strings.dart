@@ -115,6 +115,11 @@ const Map<String, Map<String, String>> _strings = {
     'The order goes back to the owner for approval. A printed bill is cancelled and you print a new one.':
         'ऑर्डर फिर से मालिक की मंज़ूरी के लिए जाएगा। छपा बिल रद्द होगा और आप नया बिल छापेंगे।',
     'Send to the owner': 'मालिक को भेजें',
+    'Edit order': 'ऑर्डर बदलें',
+    'Change asked': 'बदलाव माँगा गया',
+    'The order goes to the owner for approval. A printed bill is cancelled and loading starts again.':
+        'ऑर्डर मालिक की मंज़ूरी के लिए जाएगा। छपा बिल रद्द होगा और लोडिंग फिर से शुरू होगी।',
+    'Change sent to the owner': 'बदलाव मालिक को भेजा गया',
     'Change waiting for the owner': 'मालिक की मंज़ूरी का इंतज़ार है',
     'The owner has to approve. The printed bill is cancelled and you print a new one.':
         'मालिक को मंज़ूर करना होगा। छपा बिल रद्द होगा और आप नया बिल छापेंगे।',

@@ -128,4 +128,40 @@ void main() {
     expect(find.text('उधार सीमा से ऊपर'), findsOneWidget);
     expect(find.text('मंज़ूर करें'), findsWidgets);
   });
+
+  testWidgets('the rep edits an approved order and it waits for the owner', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 3600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final state = await demoAs(tester, 'Mill Sales');
+    await state.client!.approve('SAL-ORD-0001');
+    await tester.tap(find.text('My orders'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('edit-order-SAL-ORD-0001')));
+    await tester.pumpAndSettle();
+    // Add another item and take bags off the first
+    await tester.tap(find.byKey(const Key('add-item')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('item-ATTA-26KG')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('minus-ATTA-50KG')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const Key('edit-reason')),
+        matching: find.byType(TextField),
+      ),
+      'Shop wants a different mix',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('send-edit')));
+    await tester.pumpAndSettle();
+
+    // Back on My orders: the order waits for the owner and cannot be edited again
+    expect(find.text('Change sent to the owner'), findsOneWidget);
+    expect(find.byKey(const Key('edit-SAL-ORD-0001')), findsOneWidget);
+    expect(find.byKey(const Key('edit-order-SAL-ORD-0001')), findsNothing);
+  });
 }

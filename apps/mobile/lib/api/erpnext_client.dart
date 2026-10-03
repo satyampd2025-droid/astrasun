@@ -165,6 +165,31 @@ class ErpNextClient {
     return Order.fromJson(_message(res) as Map<String, dynamic>);
   }
 
+  /// One order in full, for the screen that edits it.
+  Future<Order> order(String name) async => Order.fromJson(
+    _message(await _post('astrasun.orders.get_order', {'name': name}))
+        as Map<String, dynamic>,
+  );
+
+  /// The rep or the warehouse changes an order; the owner has to approve it.
+  Future<Order> editOrder(
+    Order order,
+    List<OrderLine> lines,
+    String reason,
+  ) async => Order.fromJson(
+    _message(
+          await _post('astrasun.orders.edit_order', {
+            'name': order.name,
+            'items': [
+              for (final l in lines)
+                {'item_code': l.item.code, 'qty': l.qty, 'rate': l.rate},
+            ],
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
   Future<List<Order>> myOrders() async =>
       _orders(_message(await _post('astrasun.orders.my_orders', {})));
 

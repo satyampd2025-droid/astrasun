@@ -74,19 +74,24 @@ void main() {
 
     await tester.tap(find.byKey(const Key('change-SAL-ORD-0000')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '39');
-    // A reason is needed
-    await tester.tap(find.byKey(const Key('change-send')));
+    // The warehouse edits the whole order: one bag less
+    await tester.tap(find.byKey(const Key('minus-ATTA-50KG')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('change-send')), findsOneWidget);
+    expect(find.byKey(const Key('qty-ATTA-50KG')), findsOneWidget);
+    // A reason is needed before it can be sent
+    expect(
+      tester.widget<FilledButton>(find.byKey(const Key('send-edit'))).onPressed,
+      isNull,
+    );
     await tester.enterText(
       find.descendant(
-        of: find.byKey(const Key('change-reason')),
+        of: find.byKey(const Key('edit-reason')),
         matching: find.byType(TextField),
       ),
       'One bag torn',
     );
-    await tester.tap(find.byKey(const Key('change-send')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('send-edit')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('change-waiting-SAL-ORD-0000')),
@@ -94,22 +99,25 @@ void main() {
     );
     expect(find.byKey(const Key('print-SAL-ORD-0000')), findsNothing);
 
-    // The owner sees it and approves
-    final changes = await client.loadChanges();
-    expect(changes.single.newItems.first.qty, 39);
-    expect(changes.single.reason, 'One bag torn');
-    await client.decideLoadChange(changes.single, approve: true);
-    expect(await client.loadChanges(), isEmpty);
+    // The owner sees the edit and approves it
+    final waiting = (await client.pendingApprovals()).firstWhere(
+      (o) => o.edit != null,
+    );
+    expect(waiting.edit!.items.first.qty, 39);
+    expect(waiting.edit!.reason, 'One bag torn');
+    await client.approve(waiting.name);
+    expect(
+      (await client.pendingApprovals()).where((o) => o.edit != null),
+      isEmpty,
+    );
 
-    // The old bill is cancelled: the warehouse prints a new one
+    // The old bill is cancelled and the load starts again with the new bags
     await tester.tap(find.byKey(const Key('refresh')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('left-SAL-ORD-0000')), findsNothing);
-    await tester.tap(find.byKey(const Key('print-SAL-ORD-0000')));
-    await tester.pumpAndSettle();
-    expect(printed.length, 2);
-    final bill = (await client.trucksToDispatch()).single;
-    expect(bill.items.first.qty, 39);
+    expect(find.byKey(const Key('start-SAL-ORD-0000')), findsOneWidget);
+    expect(await client.trucksToDispatch(), isEmpty);
+    expect((await client.loadingQueue()).single.items.first.qty, 39);
   });
 
   testWidgets('the owner approves a load change from the Load changes tile', (

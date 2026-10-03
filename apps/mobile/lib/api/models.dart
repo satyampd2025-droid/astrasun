@@ -20,6 +20,28 @@ class OrderItem {
   final double rate;
 }
 
+/// An edit to an approved order that waits for the owner: who asked, why, and the new items.
+class OrderEdit {
+  const OrderEdit({
+    required this.by,
+    required this.reason,
+    required this.items,
+  });
+
+  factory OrderEdit.fromJson(Map<String, dynamic> j) => OrderEdit(
+    by: (j['by'] as String?) ?? '',
+    reason: (j['reason'] as String?) ?? '',
+    items: [
+      for (final i in j['items'] as List)
+        OrderItem.fromJson(i as Map<String, dynamic>),
+    ],
+  );
+
+  final String by;
+  final String reason;
+  final List<OrderItem> items;
+}
+
 /// One row of an order's timeline. [state] is done, current or todo.
 class TimelineRow {
   const TimelineRow(this.label, this.state);
@@ -54,6 +76,8 @@ class Order {
     this.paid = 0,
     this.withCollector = 0,
     this.remaining = 0,
+    this.canEdit = false,
+    this.edit,
   }) : stage =
            stage ??
            (status == 'Pending Approval' ? 'Waiting for approval' : status),
@@ -81,6 +105,10 @@ class Order {
     paid: (j['paid'] as num? ?? 0).toDouble(),
     withCollector: (j['with_collector'] as num? ?? 0).toDouble(),
     remaining: (j['remaining'] as num? ?? 0).toDouble(),
+    canEdit: j['can_edit'] as bool? ?? false,
+    edit: j['edit'] == null
+        ? null
+        : OrderEdit.fromJson(j['edit'] as Map<String, dynamic>),
     items: [
       for (final i in j['items'] as List)
         OrderItem.fromJson(i as Map<String, dynamic>),
@@ -126,12 +154,21 @@ class Order {
   final double remaining;
   final List<OrderItem> items;
 
+  /// Whether the rep or warehouse may still edit it (nothing has left yet), and the
+  /// edit that waits for the owner, if any.
+  final bool canEdit;
+  final OrderEdit? edit;
+
   Order copyWith({
     String? status,
     String? note,
     String? stage,
     String? tone,
     List<TimelineRow>? timeline,
+    List<OrderItem>? items,
+    bool? canEdit,
+    OrderEdit? edit,
+    bool clearEdit = false,
   }) => Order(
     name: name,
     customerName: customerName,
@@ -139,8 +176,12 @@ class Order {
     stage: stage ?? this.stage,
     tone: tone ?? this.tone,
     timeline: timeline ?? this.timeline,
-    total: total,
-    items: items,
+    total: items == null
+        ? total
+        : items.fold<double>(0, (sum, i) => sum + i.qty * i.rate),
+    items: items ?? this.items,
+    canEdit: canEdit ?? this.canEdit,
+    edit: clearEdit ? null : edit ?? this.edit,
     note: note ?? this.note,
     creditOutstanding: creditOutstanding,
     creditLimit: creditLimit,
