@@ -268,6 +268,7 @@ def _approve_edit(doc, note):
 			frappe.delete_doc("Delivery Note", name, force=1, ignore_permissions=True)
 		# ERPNext's own way to change a submitted order is to cancel it and amend it: the amended
 		# copy carries the old number with a suffix, and the old order stays on record.
+		doc.reload()
 		old_name, submitted_by, remarks, owner = (
 			doc.name,
 			doc.astrasun_submitted_by,
