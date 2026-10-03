@@ -10,7 +10,7 @@ on:
     inputs:
       modules:
         description: "Test modules to run, space separated"
-        default: "test_edit_order test_stages"
+        default: "test_acceptance test_api test_audit test_dashboard test_delivery_payments test_edit_order test_invoicing test_load_changes test_loading test_milling test_order_stages test_orders test_packing test_receipts test_setup test_stages test_vehicles test_wheat"
 
 concurrency:
   group: diagnose-stages
@@ -18,7 +18,7 @@ concurrency:
 
 env:
   ADMIN_PASSWORD: ci-admin-pass-1
-  MODULES: ${{ github.event.inputs.modules || 'test_edit_order test_stages' }}
+  MODULES: ${{ github.event.inputs.modules || 'test_acceptance test_api test_audit test_dashboard test_delivery_payments test_edit_order test_invoicing test_load_changes test_loading test_milling test_order_stages test_orders test_packing test_receipts test_setup test_stages test_vehicles test_wheat' }}
 
 jobs:
   stages:
