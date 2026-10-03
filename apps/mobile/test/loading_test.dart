@@ -38,6 +38,17 @@ void main() {
     await tester.pumpAndSettle();
     // The driver comes with the vehicle
     expect(find.text('Driver Ramesh Driver'), findsOneWidget);
+    // The warehouse picks the batch; nothing is chosen for them
+    await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('batch-missing-SAL-ORD-0000')), findsOneWidget);
+    for (final item in ['ATTA-50KG', 'ATTA-10KG']) {
+      await tester.tap(find.byKey(Key('batch-SAL-ORD-0000-$item')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('PK-DEMO-2026-00001').last);
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const Key('batch-missing-SAL-ORD-0000')), findsNothing);
     await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.textContaining('MP09AB1234'), findsWidgets);

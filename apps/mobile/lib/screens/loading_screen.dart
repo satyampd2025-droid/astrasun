@@ -124,8 +124,15 @@ class _LoadingScreenState extends State<LoadingScreen> {
               task: t,
               vehicles: _vehicles,
               onStart: () => _run(() => widget.client.startLoading(t)),
-              onLoaded: (vehicle, loaded) =>
-                  _run(() => widget.client.markLoaded(t, vehicle, loaded)),
+              loadBatches: widget.client.batchesInStock,
+              onLoaded: (vehicle, loaded, batches) => _run(
+                () => widget.client.markLoaded(
+                  t,
+                  vehicle,
+                  loaded,
+                  batches: batches,
+                ),
+              ),
               onPrint: () => _printBill(t),
               onLeft: () => _run(() => widget.client.dispatchTruck(t)),
               onChange: () => _edit(t),
@@ -142,6 +149,7 @@ class _TaskCard extends StatefulWidget {
     required this.task,
     required this.vehicles,
     required this.onStart,
+    required this.loadBatches,
     required this.onLoaded,
     required this.onPrint,
     required this.onLeft,
@@ -150,7 +158,13 @@ class _TaskCard extends StatefulWidget {
   final LoadingTask task;
   final List<Vehicle> vehicles;
   final VoidCallback onStart;
-  final void Function(String vehicle, Map<String, int> loaded) onLoaded;
+  final Future<List<BatchStock>> Function(String itemCode) loadBatches;
+  final void Function(
+    String vehicle,
+    Map<String, int> loaded,
+    Map<String, String> batches,
+  )
+  onLoaded;
   final VoidCallback onPrint;
   final VoidCallback onLeft;
   final VoidCallback onChange;
@@ -165,15 +179,43 @@ class _TaskCardState extends State<_TaskCard> {
       ? widget.task.vehicleNo
       : null;
   bool _missing = false;
+  bool _batchMissing = false;
+
+  /// Batches in stock per item, and the one the warehouse chose for each.
+  final Map<String, List<BatchStock>> _stock = {};
+  final Map<String, String> _batch = {};
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.task.status != 'Loading') return;
+    for (final i in widget.task.items) {
+      widget
+          .loadBatches(i.itemCode)
+          .then((b) {
+            if (mounted) setState(() => _stock[i.itemCode] = b);
+          })
+          .catchError((_) {});
+    }
+  }
 
   void _finish() {
-    if (_vehicle == null) {
-      setState(() => _missing = true);
+    final noBatch = widget.task.items.any(
+      (i) =>
+          (_stock[i.itemCode] ?? []).isNotEmpty && _batch[i.itemCode] == null,
+    );
+    if (_vehicle == null || noBatch) {
+      setState(() {
+        _missing = _vehicle == null;
+        _batchMissing = noBatch;
+      });
       return;
     }
-    widget.onLoaded(_vehicle!, {
-      for (final i in widget.task.items) i.itemCode: i.qty.round(),
-    });
+    widget.onLoaded(
+      _vehicle!,
+      {for (final i in widget.task.items) i.itemCode: i.qty.round()},
+      {..._batch},
+    );
   }
 
   @override
@@ -272,6 +314,44 @@ class _TaskCardState extends State<_TaskCard> {
                 onPressed: widget.onChange,
               ),
             if (loading && !t.changeRequested) ...[
+              for (final i in t.items)
+                if ((_stock[i.itemCode] ?? []).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: DropdownButtonFormField<String>(
+                      key: Key('batch-${t.id}-${i.itemCode}'),
+                      initialValue: _batch[i.itemCode],
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '${s.t('Batch')} - ${i.itemName}',
+                      ),
+                      items: [
+                        for (final b in _stock[i.itemCode]!)
+                          DropdownMenuItem(
+                            value: b.batchNo,
+                            enabled: b.qty >= i.qty,
+                            child: Text(
+                              '${b.batchNo} (${b.qty.round()} ${s.t('bags')})',
+                            ),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _batch[i.itemCode] = v!;
+                        _batchMissing = false;
+                      }),
+                    ),
+                  ),
+              if (_batchMissing)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    s.t('Pick the batch'),
+                    key: Key('batch-missing-${t.id}'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
               if (widget.vehicles.isEmpty)
                 Text(
                   s.t('No vehicles yet. Ask the owner to add them.'),

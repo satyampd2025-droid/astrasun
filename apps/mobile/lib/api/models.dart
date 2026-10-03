@@ -355,6 +355,19 @@ class LoadingTask {
 }
 
 /// A truck the mill loads, with the driver who goes with it.
+/// One batch of a bag item with bags in stock; the warehouse picks which one goes on the truck.
+class BatchStock {
+  const BatchStock({required this.batchNo, required this.qty});
+
+  factory BatchStock.fromJson(Map<String, dynamic> j) => BatchStock(
+    batchNo: j['batch_no'] as String,
+    qty: (j['qty'] as num).toDouble(),
+  );
+
+  final String batchNo;
+  final double qty;
+}
+
 class Vehicle {
   const Vehicle({
     required this.vehicleNo,

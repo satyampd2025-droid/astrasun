@@ -137,6 +137,8 @@ const Map<String, Map<String, String>> _strings = {
     'Available for loading': 'लोडिंग के लिए उपलब्ध',
     'Not available': 'उपलब्ध नहीं',
     'Pick the vehicle': 'गाड़ी चुनें',
+    'Pick the batch': 'बैच चुनें',
+    'Batch': 'बैच',
     'Driver {0}': 'ड्राइवर {0}',
     'No vehicles yet. Ask the owner to add them.':
         'अभी कोई गाड़ी नहीं है। मालिक से जुड़वाएं।',

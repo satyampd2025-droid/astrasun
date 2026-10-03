@@ -411,11 +411,18 @@ class DemoClient extends ErpNextClient {
   }
 
   @override
+  Future<List<BatchStock>> batchesInStock(String itemCode) async => const [
+    BatchStock(batchNo: 'PK-DEMO-2026-00001', qty: 200),
+    BatchStock(batchNo: 'PK-DEMO-2026-00002', qty: 60),
+  ];
+
+  @override
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
-    Map<String, int> loaded,
-  ) async {
+    Map<String, int> loaded, {
+    Map<String, String> batches = const {},
+  }) async {
     final vehicle = _vehicles.firstWhere(
       (v) => v.enabled && v.vehicleNo == vehicleNo,
       orElse: () => throw Exception('vehicle'),
