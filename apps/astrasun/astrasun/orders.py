@@ -281,6 +281,8 @@ def _approve_edit(doc, note):
 		new = frappe.copy_doc(doc)
 		new.docstatus = 0
 		new.amended_from = old_name
+		# copy_doc keeps no_copy fields: the edit that was just applied must not come along
+		new.astrasun_edit_json = new.astrasun_edit_note = new.astrasun_edit_by = None
 		new.items = []
 		for row in payload["items"]:
 			new.append(

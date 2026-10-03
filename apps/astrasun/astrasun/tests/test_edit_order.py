@@ -96,7 +96,8 @@ class TestEditOrder(MillFixture):
 		frappe.set_user(self.loader)
 		queue = loading.queue()
 		self.assertEqual(queue["loading"], [])
-		self.assertEqual(queue["waiting"][0]["items"][0]["qty"], 7)
+		mine = [w for w in queue["waiting"] if w["sales_order"] == name]
+		self.assertEqual(mine[0]["items"][0]["qty"], 7)
 
 	def test_nobody_edits_an_order_after_a_truck_left(self):
 		_, dn, _inv = self.make_dispatched()
