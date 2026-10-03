@@ -74,12 +74,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('change-SAL-ORD-0000')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('change-less-ATTA-50KG')));
-    await tester.pump();
-    expect(
-      tester.widget<Text>(find.byKey(const Key('change-qty-ATTA-50KG'))).data,
-      '39',
-    );
+    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '39');
     // A reason is needed
     await tester.tap(find.byKey(const Key('change-send')));
     await tester.pumpAndSettle();

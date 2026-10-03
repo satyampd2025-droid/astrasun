@@ -105,6 +105,24 @@ class TestLoadChanges(MillFixture):
 		with self.assertRaises(frappe.PermissionError):
 			loading.request_change(dn, [{"item_code": ITEM, "qty": 7}], "Because")
 
+	def test_a_change_before_loading_is_done_sends_the_order_back_to_the_owner(self):
+		order = self._order(self._customer(limit=10000000), qty=10)
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(self.loader)
+		task = loading.start(order["name"])
+		asked = self._ask(task["name"], 6)
+		self.assertEqual(asked["stage"], "Waiting for approval")
+		with self.assertRaises(loading.LoadingError):
+			loading.mark_loaded(task["name"], "MP09AB1234")  # not while the owner has to decide
+		frappe.set_user(self.owner)
+		mine = next(o for o in orders.all_orders() if o["name"] == order["name"])
+		self.assertEqual(mine["stage"], "Waiting for approval")
+		done = loading.decide_change(task["name"], 1)
+		self.assertEqual((done["status"], done["items"][0]["qty"]), ("Loading", 6))
+		frappe.set_user(self.loader)
+		self.assertEqual(loading.mark_loaded(task["name"], "MP09AB1234")["status"], "Loaded")
+
 	def test_a_truck_that_left_cannot_be_changed(self):
 		_, dn, _inv = self._billed()
 		invoicing.dispatch(dn)

@@ -109,7 +109,11 @@ const Map<String, Map<String, String>> _strings = {
     'Cash with you: ₹ {0}. Hand it in at the factory; the owner marks it settled.':
         'आपके पास नकद: ₹ {0}। फैक्ट्री में जमा करें; मालिक मिलान करेंगे।',
     'Print bill': 'बिल प्रिंट करें',
-    'Change quantity': 'मात्रा बदलें',
+    'Change order': 'ऑर्डर बदलें',
+    'Bags cannot be more than the order asks for':
+        'बोरे ऑर्डर से ज़्यादा नहीं हो सकते',
+    'The order goes back to the owner for approval. A printed bill is cancelled and you print a new one.':
+        'ऑर्डर फिर से मालिक की मंज़ूरी के लिए जाएगा। छपा बिल रद्द होगा और आप नया बिल छापेंगे।',
     'Send to the owner': 'मालिक को भेजें',
     'Change waiting for the owner': 'मालिक की मंज़ूरी का इंतज़ार है',
     'The owner has to approve. The printed bill is cancelled and you print a new one.':

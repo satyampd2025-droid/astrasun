@@ -33,6 +33,11 @@ class TestStageOfAnOrder(unittest.TestCase):
 			with self.subTest(truck):
 				self.assertEqual(self.stage(trucks=[truck])["stage"], stage)
 
+	def test_a_change_waiting_for_the_owner_puts_the_order_back_to_waiting(self):
+		got = self.stage(trucks=["Loading"], change_pending=True)
+		self.assertEqual((got["stage"], got["step"]), ("Waiting for approval", 1))
+		self.assertEqual(self.stage(trucks=["Loading"])["stage"], "Loading")
+
 	def test_the_truck_furthest_behind_decides(self):
 		self.assertEqual(self.stage(trucks=["Dispatched", "Loading"])["stage"], "Loading")
 		self.assertEqual(self.stage(trucks=["Delivered", "Loaded"])["stage"], "Loaded")

@@ -222,7 +222,9 @@ def _facts(names):
 
 	Four small queries for a whole list, not four per order.
 	"""
-	facts = {n: {"trucks": [], "billed": 0.0, "outstanding": 0.0, "pending": 0.0} for n in names}
+	facts = {
+		n: {"trucks": [], "billed": 0.0, "outstanding": 0.0, "pending": 0.0, "change": False} for n in names
+	}
 	if not names:
 		return facts
 
@@ -233,21 +235,25 @@ def _facts(names):
 		distinct=True,
 	)
 	if notes:
-		status = {
-			dn.name: dn.astrasun_loading_status
-			for dn in frappe.get_all(
-				"Delivery Note",
-				filters={
-					"name": ["in", list({r.parent for r in notes})],
-					"docstatus": ["<", 2],
-					"astrasun_loading_status": ["is", "set"],
-				},
-				fields=["name", "astrasun_loading_status"],
-			)
-		}
+		status, asked = {}, set()
+		trucks = frappe.get_all(
+			"Delivery Note",
+			filters={
+				"name": ["in", list({r.parent for r in notes})],
+				"docstatus": ["<", 2],
+				"astrasun_loading_status": ["is", "set"],
+			},
+			fields=["name", "astrasun_loading_status", "astrasun_change_status"],
+		)
+		for dn in trucks:
+			status[dn.name] = dn.astrasun_loading_status
+			if dn.astrasun_change_status == "Requested" and dn.astrasun_loading_status in ("Loading", "Loaded"):
+				asked.add(dn.name)
 		for row in notes:
 			if row.parent in status:
 				facts[row.against_sales_order]["trucks"].append(status[row.parent])
+			if row.parent in asked:
+				facts[row.against_sales_order]["change"] = True
 
 	lines = frappe.get_all(
 		"Sales Invoice Item",
@@ -284,6 +290,7 @@ def summary(doc, facts=None):
 		# Money collected but not yet handed in already counts as paid on the order
 		outstanding=max(fact["outstanding"] - fact["pending"], 0),
 		cancelled=doc.docstatus == 2,
+		change_pending=fact["change"],
 	)
 	return {
 		"name": doc.name,
