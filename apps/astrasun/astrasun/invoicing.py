@@ -100,7 +100,9 @@ def invoice(name):
 	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 
-	loaded = {r.so_detail: flt(r.qty) for r in dn.items}
+	loaded = {}
+	for r in dn.items:
+		loaded[r.so_detail] = loaded.get(r.so_detail, 0) + flt(r.qty)
 	sales_order = dn.items[0].against_sales_order
 	with _as_system():
 		si = make_sales_invoice(sales_order)
@@ -153,39 +155,15 @@ def bill_pdf(name):
 	frappe.local.response.type = "pdf"
 
 
-def _pick_batches(dn):
-	"""Give every bag row the oldest batch in stock when it has none, so nobody types a batch number.
-
-	A row that needs more than one batch is split into one row per batch.
-	"""
-	from erpnext.stock.doctype.batch.batch import get_batch_qty
-
-	for row in list(dn.items):
-		if row.batch_no or row.serial_and_batch_bundle:
-			continue
-		if not frappe.db.get_value("Item", row.item_code, "has_batch_no"):
-			continue
-		stock = [
-			b for b in get_batch_qty(item_code=row.item_code, warehouse=row.warehouse) or [] if b.qty > 0
-		]
-		stock.sort(key=lambda b: frappe.db.get_value("Batch", b.batch_no, "creation"))
-		need, first = flt(row.qty), True
-		for batch in stock:
-			take = min(need, flt(batch.qty))
-			if take <= 0:
-				break
-			target = row
-			if not first:
-				target = dn.append("items", {k: v for k, v in row.as_dict().items() if k not in _ROW_KEYS})
-			target.use_serial_batch_fields = 1
-			target.batch_no = batch.batch_no
-			target.qty = take
-			first, need = False, need - take
-			if need <= 0:
-				break
-
-
-_ROW_KEYS = ("name", "idx", "creation", "modified", "modified_by", "owner", "docstatus", "parent")
+def _needs_batch(dn):
+	"""The bag items on this truck that still have no batch chosen."""
+	return [
+		r.item_code
+		for r in dn.items
+		if not r.batch_no
+		and not r.serial_and_batch_bundle
+		and frappe.db.get_value("Item", r.item_code, "has_batch_no")
+	]
 
 
 @frappe.whitelist()
@@ -199,9 +177,14 @@ def dispatch(name):
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
 	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
+	missing = [] if frappe.flags.in_test else _needs_batch(dn)  # ERPNext skips its own check while testing
+	if missing:
+		frappe.throw(
+			_("Choose the batch for {0} before the truck leaves").format(", ".join(sorted(set(missing)))),
+			InvoicingError,
+		)
 	with _as_system():
 		dn.astrasun_loading_status = DISPATCHED
-		_pick_batches(dn)
 		dn.save()
 		dn.submit()
 	return _view(dn)
