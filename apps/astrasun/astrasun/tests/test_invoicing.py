@@ -108,9 +108,9 @@ class TestInvoicing(MillFixture):
 		orders.approve(order["name"])
 		frappe.set_user(self.loader)
 		task = loading.start(order["name"])
-		stock = loading.batches(ITEM)["batches"]
+		stock = sorted(loading.batches(ITEM)["batches"], key=lambda x: -x["qty"])
 		self.assertGreaterEqual(len(stock), 2)
-		a, b = stock[0], stock[1]
+		b, a = stock[0], stock[1]  # four bags from the big batch, two from another
 		dn = loading.mark_loaded(
 			task["name"],
 			"MP09AB1234",
