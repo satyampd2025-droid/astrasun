@@ -1,0 +1,12 @@
+# HTTPS for the mill app and the public landing page. Caddy gets and renews the certificates.
+# DOMAIN comes from docker/.env; LANDING_DOMAIN defaults in compose.prod.yml.
+{$DOMAIN} {
+	reverse_proxy frontend:8080
+}
+
+{$LANDING_DOMAIN} {
+	root * /srv/landing
+	encode zstd gzip
+	file_server
+	header Cache-Control "public, max-age=300"
+}

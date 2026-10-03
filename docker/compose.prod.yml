@@ -8,12 +8,17 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN in docker/.env} --to frontend:8080
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in docker/.env}
+      # Public landing page (site/atulyaa); its DNS A record points at this same server.
+      LANDING_DOMAIN: ${LANDING_DOMAIN:-atulyaa.astrasunglobal.com}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - caddy-data:/data
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../site/atulyaa:/srv/landing:ro
     depends_on:
       - frontend
 
