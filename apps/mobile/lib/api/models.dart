@@ -179,8 +179,10 @@ class LoadingTask {
     this.customerPhone,
     this.invoice,
     this.total = 0,
-    this.ewayNeeded = false,
-    this.ewayBillNo,
+    this.changeRequested = false,
+    this.newItems = const [],
+    this.reason,
+    this.askedBy,
     String? stage,
   }) : _stage = stage;
 
@@ -197,8 +199,18 @@ class LoadingTask {
     customerPhone: json['customer_phone'] as String?,
     invoice: json['invoice'] as String?,
     total: ((json['total'] as num?) ?? 0).toDouble(),
-    ewayNeeded: (json['eway_bill_needed'] as bool?) ?? false,
-    ewayBillNo: json['eway_bill_no'] as String?,
+    changeRequested: (json['change_requested'] as bool?) ?? false,
+    newItems: [
+      for (final i in (json['new_items'] as List?) ?? const [])
+        OrderItem(
+          itemCode: i['item_code'] as String,
+          itemName: i['item_code'] as String,
+          qty: (i['qty'] as num).toDouble(),
+          rate: 0,
+        ),
+    ],
+    reason: json['reason'] as String?,
+    askedBy: json['asked_by'] as String?,
     items: [
       for (final i in json['items'] as List)
         OrderItem(
@@ -243,9 +255,12 @@ class LoadingTask {
   final String? invoice;
   final double total;
 
-  /// Goods over Rs 50,000 need an e-way bill number.
-  final bool ewayNeeded;
-  final String? ewayBillNo;
+  /// The warehouse asked to change the bags after the bill was printed; the
+  /// owner has not decided yet. [newItems] are the bags it asked for.
+  final bool changeRequested;
+  final List<OrderItem> newItems;
+  final String? reason;
+  final String? askedBy;
 
   LoadingTask copyWith({
     String? id,
@@ -256,8 +271,8 @@ class LoadingTask {
     List<OrderItem>? items,
     String? invoice,
     double? total,
-    bool? ewayNeeded,
-    String? ewayBillNo,
+    bool? changeRequested,
+    bool clearInvoice = false,
   }) => LoadingTask(
     id: id ?? this.id,
     salesOrder: salesOrder,
@@ -270,10 +285,12 @@ class LoadingTask {
     address: address,
     customerPhone: customerPhone,
     items: items ?? this.items,
-    invoice: invoice ?? this.invoice,
+    invoice: clearInvoice ? null : invoice ?? this.invoice,
     total: total ?? this.total,
-    ewayNeeded: ewayNeeded ?? this.ewayNeeded,
-    ewayBillNo: ewayBillNo ?? this.ewayBillNo,
+    changeRequested: changeRequested ?? this.changeRequested,
+    newItems: newItems,
+    reason: reason,
+    askedBy: askedBy,
   );
 }
 

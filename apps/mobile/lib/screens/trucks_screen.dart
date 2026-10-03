@@ -36,12 +36,7 @@ class _TrucksScreenState extends State<TrucksScreen> {
       );
     } on Exception catch (e) {
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            s.saveFailed(e),
-            key: const Key('save-failed'),
-          ),
-        ),
+        SnackBar(content: Text(s.saveFailed(e), key: const Key('save-failed'))),
       );
     }
     _reload();
@@ -78,10 +73,8 @@ class _TrucksScreenState extends State<TrucksScreen> {
               key: ValueKey(t.id),
               task: t,
               mode: widget.mode,
-              onInvoice: (eway) => _run(
-                () => widget.client.invoiceTruck(t, eway),
-                'Invoice made',
-              ),
+              onInvoice: () =>
+                  _run(() => widget.client.invoiceTruck(t), 'Invoice made'),
               onDispatch: () =>
                   _run(() => widget.client.dispatchTruck(t), 'Truck left'),
             ),
@@ -101,7 +94,7 @@ class _TruckCard extends StatefulWidget {
   });
   final LoadingTask task;
   final TruckMode mode;
-  final void Function(String eway) onInvoice;
+  final VoidCallback onInvoice;
   final VoidCallback onDispatch;
 
   @override
@@ -109,8 +102,6 @@ class _TruckCard extends StatefulWidget {
 }
 
 class _TruckCardState extends State<_TruckCard> {
-  final _eway = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -143,28 +134,17 @@ class _TruckCardState extends State<_TruckCard> {
               ),
             const SizedBox(height: 12),
             if (widget.mode == TruckMode.invoice) ...[
-              TextField(
-                key: Key('eway-${t.id}'),
-                controller: _eway,
-                decoration: InputDecoration(
-                  labelText: s.t('E-way bill number'),
-                  helperText: s.t('Needed when goods are over ₹50,000'),
-                ),
-              ),
-              const SizedBox(height: 12),
               FilledButton.icon(
                 key: Key('invoice-${t.id}'),
                 icon: const Icon(Icons.receipt_long),
                 label: Text(s.t('Make invoice')),
-                onPressed: () => widget.onInvoice(_eway.text.trim()),
+                onPressed: widget.onInvoice,
               ),
             ] else ...[
               Text(
                 '${s.t('Invoice')} ${t.invoice}  ${rupees(t.total)}',
                 style: const TextStyle(fontSize: 18),
               ),
-              if (t.ewayBillNo != null && t.ewayBillNo!.isNotEmpty)
-                Text('${s.t('E-way bill number')}: ${t.ewayBillNo}'),
               const SizedBox(height: 12),
               FilledButton.icon(
                 key: Key('dispatch-${t.id}'),

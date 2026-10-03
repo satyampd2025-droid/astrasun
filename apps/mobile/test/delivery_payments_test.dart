@@ -18,7 +18,7 @@ void main() {
     final loaded = await client.markLoaded(started, 'MP09AB1234', {
       'ATTA-10KG': 20,
     });
-    await client.invoiceTruck(loaded, '');
+    await client.invoiceTruck(loaded);
     await client.dispatchTruck(loaded);
 
     await tester.tap(find.text('My deliveries'));
