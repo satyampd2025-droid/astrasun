@@ -5,6 +5,8 @@ Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
 which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
@@ -108,6 +110,26 @@ def invoice(name):
 	return _view(dn)
 
 
+def _pdf_without_what_it_cannot_fetch(html):
+	"""The PDF tool runs inside the server and fetches pictures and styles by their web address. When
+	that fails (a logo that is gone, a server it cannot reach) the whole bill fails, so it tries again
+	without the pictures, then without the linked styles and scripts too."""
+	steps = (
+		None,
+		(r"<img\b[^>]*>",),
+		(r"<img\b[^>]*>", r"<link\b[^>]*>", r"<script\b[^>]*\bsrc=[^>]*>\s*</script>"),
+	)
+	for patterns in steps:
+		body = html
+		for pattern in patterns or ():
+			body = re.sub(pattern, "", body, flags=re.I)
+		try:
+			return get_pdf(body)
+		except (OSError, frappe.ValidationError):
+			if patterns is steps[-1]:
+				raise
+
+
 @frappe.whitelist()
 def bill_pdf(name):
 	"""The truck's bill as a PDF, for the phone to print."""
@@ -116,10 +138,8 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		# The PDF tool runs inside the server and cannot always fetch pictures or styles by their web
-		# address, which fails the whole bill; whatever it cannot fetch is left out instead.
 		html = frappe.get_print("Sales Invoice", invoice_name, no_letterhead=1)
-		pdf = get_pdf(html, {"load-error-handling": "ignore", "load-media-error-handling": "ignore"})
+		pdf = _pdf_without_what_it_cannot_fetch(html)
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"
