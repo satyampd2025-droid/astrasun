@@ -29,22 +29,13 @@ void main() {
     expect(find.text('Sharma Kirana Store'), findsOneWidget);
     expect(find.text('Loaded'), findsOneWidget);
 
-    // 40 x 2150 + 20 x 440 = 94,800: over 50,000, so the e-way bill is needed
-    await tester.tap(find.byKey(const Key('invoice-SAL-ORD-0000')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('save-failed')), findsOneWidget);
-    expect(find.text('Sharma Kirana Store'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('eway-SAL-ORD-0000')),
-      '271000123456',
-    );
+    // 40 x 2150 + 20 x 440 = 94,800. No e-way bill number is asked for (v2).
+    expect(find.byKey(const Key('eway-SAL-ORD-0000')), findsNothing);
     await tester.tap(find.byKey(const Key('invoice-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('no-trucks')), findsOneWidget);
 
     final billed = await client.trucksToDispatch();
-    expect(billed.single.ewayBillNo, '271000123456');
     expect(billed.single.total, 94800);
   });
 
@@ -69,7 +60,7 @@ void main() {
     // Not billed yet: the truck cannot leave
     expect(find.byKey(const Key('no-trucks')), findsOneWidget);
 
-    await client.invoiceTruck(loaded, '');
+    await client.invoiceTruck(loaded);
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send trucks'));

@@ -43,8 +43,9 @@ void main() {
     expect(find.text('Driver Ramesh Driver'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('MP09AB1234'), findsOneWidget);
-    expect(find.byKey(const Key('nothing-to-load')), findsOneWidget);
+    expect(find.textContaining('MP09AB1234'), findsWidgets);
+    // It stays on the warehouse's screen, now to print the bill
+    expect(find.byKey(const Key('print-SAL-ORD-0000')), findsOneWidget);
   });
 
   testWidgets('an order approved by the owner appears for the loader', (

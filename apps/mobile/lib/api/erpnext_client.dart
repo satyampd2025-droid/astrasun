@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
@@ -282,16 +283,65 @@ class ErpNextClient {
   Future<List<LoadingTask>> trucksToDispatch() async =>
       _trucks(_message(await _post('astrasun.invoicing.to_dispatch', {})));
 
-  Future<LoadingTask> invoiceTruck(LoadingTask task, String ewayBillNo) async =>
+  /// Print bill: bills the truck from the bags loaded.
+  Future<LoadingTask> invoiceTruck(LoadingTask task) async =>
       LoadingTask.fromJson(
-        _message(
-              await _post('astrasun.invoicing.invoice', {
-                'name': task.id,
-                'eway_bill_no': ewayBillNo,
-              }),
-            )
+        _message(await _post('astrasun.invoicing.invoice', {'name': task.id}))
             as Map<String, dynamic>,
       );
+
+  /// The truck's bill as a PDF, for the phone's print screen.
+  Future<Uint8List> billPdf(LoadingTask task) async {
+    final http.Response res;
+    try {
+      res = await _http.get(
+        Uri.parse(
+          '$baseUrl/api/method/astrasun.invoicing.bill_pdf'
+          '?name=${Uri.encodeQueryComponent(task.id)}',
+        ),
+        headers: _headers,
+      );
+    } on Exception {
+      throw ServerUnreachable();
+    }
+    if (res.statusCode != 200) throw _refusal(res) ?? ServerUnreachable();
+    return res.bodyBytes;
+  }
+
+  /// The bags changed after the bill was printed; the owner has to approve.
+  Future<LoadingTask> requestLoadChange(
+    LoadingTask task,
+    Map<String, int> bags,
+    String reason,
+  ) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.loading.request_change', {
+            'name': task.id,
+            'items': [
+              for (final e in bags.entries)
+                {'item_code': e.key, 'qty': e.value},
+            ],
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<List<LoadingTask>> loadChanges() async =>
+      _trucks(_message(await _post('astrasun.loading.change_requests', {})));
+
+  Future<LoadingTask> decideLoadChange(
+    LoadingTask task, {
+    required bool approve,
+  }) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.loading.decide_change', {
+            'name': task.id,
+            'approve': approve ? 1 : 0,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
 
   Future<LoadingTask> dispatchTruck(LoadingTask task) async =>
       LoadingTask.fromJson(

@@ -10,6 +10,7 @@ import 'coming_soon_screen.dart';
 import 'dashboard_screen.dart';
 import 'deliveries_screen.dart';
 import 'dues_screen.dart';
+import 'load_changes_screen.dart';
 import 'loading_screen.dart';
 import 'new_order_screen.dart';
 import 'order_list_screen.dart';
@@ -298,6 +299,7 @@ Widget _screenFor(Task task, ErpNextClient client, S s, bool collect) =>
       'Send trucks' => TrucksScreen(client: client, mode: TruckMode.dispatch),
       'My deliveries' => DeliveriesScreen(client: client),
       'Vehicles' => VehiclesScreen(client: client),
+      'Load changes' => LoadChangesScreen(client: client),
       'Collect payment' ||
       'Customer dues' => DuesScreen(client: client, canCollect: collect),
       'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),

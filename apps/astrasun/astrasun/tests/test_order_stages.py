@@ -36,7 +36,7 @@ class TestOrderStages(MillFixture):
 		self.assertEqual(self.seen_by_rep(order["name"])["stage"], "Loaded")
 
 		frappe.set_user(self.accounts)
-		invoicing.invoice(task["name"], "271000123456")
+		invoicing.invoice(task["name"])
 		self.assertEqual(self.seen_by_rep(order["name"])["stage"], "Loaded")
 
 		frappe.set_user(self.dispatcher)
@@ -97,7 +97,7 @@ class TestOrderStages(MillFixture):
 		self.assertEqual(
 			[t["stage"] for t in invoicing.to_invoice() if t["name"] == task["name"]], ["Loaded"]
 		)
-		invoicing.invoice(task["name"], "271000123456")
+		invoicing.invoice(task["name"])
 
 		frappe.set_user(self.dispatcher)
 		self.assertEqual(

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
+import '../print_bill.dart';
 import '../strings.dart';
 import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
+import '../widgets/voice_text_field.dart';
 
 /// Warehouse: approved orders to load onto trucks.
 class LoadingScreen extends StatefulWidget {
@@ -63,6 +65,22 @@ class _LoadingScreenState extends State<LoadingScreen> {
     _reload();
   }
 
+  /// Print bill: bills the truck if it has no bill yet, then opens the print screen.
+  Future<void> _printBill(LoadingTask t) async {
+    final s = S.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final billed = t.invoice == null
+          ? await widget.client.invoiceTruck(t)
+          : t;
+      final pdf = await widget.client.billPdf(billed);
+      await billPrinter(pdf, billed.invoice ?? billed.id);
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
+    }
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -85,6 +103,10 @@ class _LoadingScreenState extends State<LoadingScreen> {
               onStart: () => _run(() => widget.client.startLoading(t)),
               onLoaded: (vehicle, loaded) =>
                   _run(() => widget.client.markLoaded(t, vehicle, loaded)),
+              onPrint: () => _printBill(t),
+              onLeft: () => _run(() => widget.client.dispatchTruck(t)),
+              onChange: (bags, reason) =>
+                  _run(() => widget.client.requestLoadChange(t, bags, reason)),
             ),
         ],
       ),
@@ -99,11 +121,17 @@ class _TaskCard extends StatefulWidget {
     required this.vehicles,
     required this.onStart,
     required this.onLoaded,
+    required this.onPrint,
+    required this.onLeft,
+    required this.onChange,
   });
   final LoadingTask task;
   final List<Vehicle> vehicles;
   final VoidCallback onStart;
   final void Function(String vehicle, Map<String, int> loaded) onLoaded;
+  final VoidCallback onPrint;
+  final VoidCallback onLeft;
+  final void Function(Map<String, int> bags, String reason) onChange;
 
   @override
   State<_TaskCard> createState() => _TaskCardState();
@@ -132,6 +160,84 @@ class _TaskCardState extends State<_TaskCard> {
       return;
     }
     widget.onLoaded(_vehicle!, _qty);
+  }
+
+  /// After the bill is printed the bags can still change, with the owner's approval.
+  Future<void> _askChange() async {
+    final s = S.of(context);
+    final bags = {for (final i in widget.task.items) i.itemCode: i.qty.round()};
+    final reason = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: Text(s.t('Change quantity')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final i in widget.task.items)
+                  Row(
+                    children: [
+                      Expanded(child: Text(i.itemName)),
+                      IconButton(
+                        key: Key('change-less-${i.itemCode}'),
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: () => setLocal(() {
+                          if (bags[i.itemCode]! > 0) {
+                            bags[i.itemCode] = bags[i.itemCode]! - 1;
+                          }
+                        }),
+                      ),
+                      Text(
+                        '${bags[i.itemCode]}',
+                        key: Key('change-qty-${i.itemCode}'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      IconButton(
+                        key: Key('change-more-${i.itemCode}'),
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: () => setLocal(
+                          () => bags[i.itemCode] = bags[i.itemCode]! + 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                VoiceTextField(
+                  key: const Key('change-reason'),
+                  controller: reason,
+                  label: s.t('Reason'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  s.t(
+                    'The owner has to approve. The printed bill is cancelled and you print a new one.',
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(s.t('Back')),
+            ),
+            FilledButton(
+              key: const Key('change-send'),
+              onPressed: () {
+                if (reason.text.trim().isNotEmpty) Navigator.pop(context, true);
+              },
+              child: Text(s.t('Send to the owner')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) widget.onChange(bags, reason.text.trim());
   }
 
   @override
@@ -213,6 +319,45 @@ class _TaskCardState extends State<_TaskCard> {
                 label: Text(s.t('Start loading')),
                 onPressed: widget.onStart,
               ),
+            if (t.status == 'Loaded') ...[
+              if ((t.vehicleNo ?? '').isNotEmpty)
+                Text(
+                  '${s.t('Vehicle {0}', [t.vehicleNo!])}'
+                  '${(t.driverName ?? '').isEmpty ? '' : ' - ${t.driverName}'}',
+                ),
+              if (t.changeRequested)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    s.t('Change waiting for the owner'),
+                    key: Key('change-waiting-${t.id}'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                )
+              else ...[
+                FilledButton.icon(
+                  key: Key('print-${t.id}'),
+                  icon: const Icon(Icons.print_outlined),
+                  label: Text(s.t('Print bill')),
+                  onPressed: widget.onPrint,
+                ),
+                if (t.invoice != null) ...[
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    key: Key('left-${t.id}'),
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: Text(s.t('Truck left')),
+                    onPressed: widget.onLeft,
+                  ),
+                ],
+                TextButton.icon(
+                  key: Key('change-${t.id}'),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: Text(s.t('Change quantity')),
+                  onPressed: _askChange,
+                ),
+              ],
+            ],
             if (loading) ...[
               if (widget.vehicles.isEmpty)
                 Text(

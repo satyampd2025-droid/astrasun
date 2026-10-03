@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'erpnext_client.dart';
 import 'models.dart';
 
@@ -254,7 +256,10 @@ class DemoClient extends ErpNextClient {
   @override
   Future<List<LoadingTask>> loadingQueue() async => [
     for (final t in _loading)
-      if (t.status != 'Loaded') t,
+      if (t.status == 'Waiting' ||
+          t.status == 'Loading' ||
+          t.status == 'Loaded')
+        t,
   ];
 
   @override
@@ -353,29 +358,113 @@ class DemoClient extends ErpNextClient {
   @override
   Future<List<LoadingTask>> trucksToInvoice() async => [
     for (final t in _loading)
-      if (t.status == 'Loaded' && t.invoice == null) t,
+      if (t.status == 'Loaded' && t.invoice == null && !t.changeRequested) t,
   ];
 
   @override
   Future<List<LoadingTask>> trucksToDispatch() async => [
     for (final t in _loading)
-      if (t.status == 'Loaded' && t.invoice != null) t,
+      if (t.status == 'Loaded' && t.invoice != null && !t.changeRequested) t,
   ];
 
   @override
-  Future<LoadingTask> invoiceTruck(LoadingTask task, String ewayBillNo) async {
-    final total = _worth(task.items);
-    if (total > 50000 && ewayBillNo.trim().isEmpty) throw Exception('eway');
+  Future<LoadingTask> invoiceTruck(LoadingTask task) async {
+    if (task.changeRequested) throw Exception('change waiting');
     return _setTask(
       task.id,
       (t) => t.copyWith(
         invoice: 'SINV-${task.id.substring(task.id.length - 4)}',
-        total: total,
-        ewayNeeded: total > 50000,
-        ewayBillNo: ewayBillNo.trim(),
+        total: _worth(t.items),
       ),
     );
   }
+
+  /// A one-page PDF with the bill number, so the print screen has something to show.
+  @override
+  Future<Uint8List> billPdf(LoadingTask task) async => Uint8List.fromList(
+    '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+            '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+            '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n'
+            'trailer<</Root 1 0 R>>\n%%EOF'
+        .codeUnits,
+  );
+
+  @override
+  Future<LoadingTask> requestLoadChange(
+    LoadingTask task,
+    Map<String, int> bags,
+    String reason,
+  ) async {
+    if (reason.trim().isEmpty) throw Exception('reason');
+    return _setTask(
+      task.id,
+      (t) => LoadingTask(
+        id: t.id,
+        salesOrder: t.salesOrder,
+        customerName: t.customerName,
+        status: t.status,
+        vehicleNo: t.vehicleNo,
+        driverName: t.driverName,
+        address: t.address,
+        customerPhone: t.customerPhone,
+        invoice: t.invoice,
+        total: t.total,
+        items: t.items,
+        changeRequested: true,
+        newItems: [
+          for (final e in bags.entries)
+            OrderItem(
+              itemCode: e.key,
+              itemName: e.key,
+              qty: e.value.toDouble(),
+              rate: 0,
+            ),
+        ],
+        reason: reason.trim(),
+        askedBy: 'warehouse',
+      ),
+    );
+  }
+
+  @override
+  Future<List<LoadingTask>> loadChanges() async => [
+    for (final t in _loading)
+      if (t.changeRequested) t,
+  ];
+
+  @override
+  Future<LoadingTask> decideLoadChange(
+    LoadingTask task, {
+    required bool approve,
+  }) async => _setTask(task.id, (t) {
+    final bags = {for (final i in t.newItems) i.itemCode: i.qty};
+    final changed = LoadingTask(
+      id: t.id,
+      salesOrder: t.salesOrder,
+      customerName: t.customerName,
+      status: t.status,
+      vehicleNo: t.vehicleNo,
+      driverName: t.driverName,
+      address: t.address,
+      customerPhone: t.customerPhone,
+      // Approving cancels the printed bill; the warehouse prints a new one
+      invoice: approve ? null : t.invoice,
+      total: approve ? 0 : t.total,
+      items: approve
+          ? [
+              for (final i in t.items)
+                if ((bags[i.itemCode] ?? 0) > 0)
+                  OrderItem(
+                    itemCode: i.itemCode,
+                    itemName: i.itemName,
+                    qty: bags[i.itemCode]!,
+                    rate: i.rate,
+                  ),
+            ]
+          : t.items,
+    );
+    return changed;
+  });
 
   @override
   Future<LoadingTask> dispatchTruck(LoadingTask task) async {
