@@ -34,6 +34,7 @@ class TestLoadChanges(MillFixture):
 		html = frappe.get_print("Sales Invoice", _inv, print_format=NAME)
 		for part in (_inv, "Tax Invoice", "Bill To", "Tax Summary", "Invoice Amount in Words", "Balance"):
 			self.assertIn(part, html)
+		frappe.clear_cache(doctype="Sales Invoice")
 		self.assertEqual(frappe.get_meta("Sales Invoice").default_print_format, NAME)
 		frappe.set_user(self.loader)
 		invoicing.bill_pdf(dn)
