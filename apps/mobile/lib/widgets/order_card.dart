@@ -84,6 +84,16 @@ class OrderCard extends StatelessWidget {
                   '${i.itemName} × ${i.qty.round()}  @ ${rupees(i.rate)}',
                   style: theme.textTheme.bodyLarge,
                 ),
+              if (order.billed > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${s.t('Billed')} ${rupees(order.billed)}  ·  '
+                  '${s.t('Paid')} ${rupees(order.paid)}'
+                  '${order.withCollector > 0 ? '  ·  ${s.t('With collector')} ${rupees(order.withCollector)}' : ''}'
+                  '  ·  ${s.t('Left to pay')} ${rupees(order.remaining)}',
+                  key: Key('money-${order.name}'),
+                ),
+              ],
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
