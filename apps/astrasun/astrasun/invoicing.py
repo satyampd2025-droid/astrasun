@@ -19,6 +19,14 @@ from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
 DISPATCH_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 DISPATCHED = "Dispatched"
+# The mill prints its bills on A5
+PAGE = {
+	"page-size": "A5",
+	"margin-top": "7mm",
+	"margin-bottom": "7mm",
+	"margin-left": "7mm",
+	"margin-right": "7mm",
+}
 
 
 class InvoicingError(frappe.ValidationError):
@@ -74,8 +82,7 @@ def to_dispatch():
 
 def _edit_waiting(dn):
 	return bool(
-		dn.items
-		and frappe.db.get_value("Sales Order", dn.items[0].against_sales_order, "astrasun_edit_json")
+		dn.items and frappe.db.get_value("Sales Order", dn.items[0].against_sales_order, "astrasun_edit_json")
 	)
 
 
@@ -125,7 +132,7 @@ def _pdf_without_what_it_cannot_fetch(html):
 		for pattern in patterns or ():
 			body = re.sub(pattern, "", body, flags=re.I)
 		try:
-			return get_pdf(body)
+			return get_pdf(body, PAGE)
 		except (OSError, frappe.ValidationError):
 			if patterns is steps[-1]:
 				raise
@@ -139,13 +146,46 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		html = frappe.get_print(
-			"Sales Invoice", invoice_name, print_format=BILL_FORMAT, no_letterhead=1
-		)
+		html = frappe.get_print("Sales Invoice", invoice_name, print_format=BILL_FORMAT, no_letterhead=1)
 		pdf = _pdf_without_what_it_cannot_fetch(html)
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"
+
+
+def _pick_batches(dn):
+	"""Give every bag row the oldest batch in stock when it has none, so nobody types a batch number.
+
+	A row that needs more than one batch is split into one row per batch.
+	"""
+	from erpnext.stock.doctype.batch.batch import get_batch_qty
+
+	for row in list(dn.items):
+		if row.batch_no or row.serial_and_batch_bundle:
+			continue
+		if not frappe.db.get_value("Item", row.item_code, "has_batch_no"):
+			continue
+		stock = [
+			b for b in get_batch_qty(item_code=row.item_code, warehouse=row.warehouse) or [] if b.qty > 0
+		]
+		stock.sort(key=lambda b: frappe.db.get_value("Batch", b.batch_no, "creation"))
+		need, first = flt(row.qty), True
+		for batch in stock:
+			take = min(need, flt(batch.qty))
+			if take <= 0:
+				break
+			target = row
+			if not first:
+				target = dn.append("items", {k: v for k, v in row.as_dict().items() if k not in _ROW_KEYS})
+			target.use_serial_batch_fields = 1
+			target.batch_no = batch.batch_no
+			target.qty = take
+			first, need = False, need - take
+			if need <= 0:
+				break
+
+
+_ROW_KEYS = ("name", "idx", "creation", "modified", "modified_by", "owner", "docstatus", "parent")
 
 
 @frappe.whitelist()
@@ -161,6 +201,7 @@ def dispatch(name):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 	with _as_system():
 		dn.astrasun_loading_status = DISPATCHED
+		_pick_batches(dn)
 		dn.save()
 		dn.submit()
 	return _view(dn)

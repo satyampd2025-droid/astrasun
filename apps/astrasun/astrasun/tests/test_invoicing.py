@@ -68,13 +68,9 @@ class TestInvoicing(MillFixture):
 			invoicing.dispatch(dn)  # accounts bill, they do not send trucks
 
 	def test_the_truck_leaves_without_anyone_typing_a_batch(self):
-		# ERPNext skips its batch check while testing, so switch the test mode off to see what a real server does
-		from astrasun.setup.install import setup_stock_settings
-
-		setup_stock_settings()
-		self.assertEqual(
-			frappe.db.get_single_value("Stock Settings", "auto_create_serial_and_batch_bundle_for_outward"), 1
-		)
+		# ERPNext skips its batch check while testing, so switch the test mode off to see what a real server does,
+		# and switch its own batch picking off so only the app's picking is at work
+		frappe.db.set_single_value("Stock Settings", "auto_create_serial_and_batch_bundle_for_outward", 0)
 		so, dn = self._loaded(qty=4)
 		frappe.set_user(self.accounts)
 		invoicing.invoice(dn)
@@ -85,3 +81,8 @@ class TestInvoicing(MillFixture):
 		finally:
 			frappe.flags.in_test = in_test
 		self.assertEqual(out["status"], "Dispatched")
+		rows = frappe.get_all(
+			"Delivery Note Item", filters={"parent": dn}, fields=["qty", "serial_and_batch_bundle"]
+		)
+		self.assertEqual(sum(r.qty for r in rows), 4)
+		self.assertTrue(all(r.serial_and_batch_bundle for r in rows))
