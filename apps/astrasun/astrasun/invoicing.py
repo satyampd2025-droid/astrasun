@@ -13,6 +13,7 @@ from frappe.utils import flt, nowdate
 from frappe.utils.pdf import get_pdf
 
 from astrasun import audit
+from astrasun.setup.print_format import NAME as BILL_FORMAT
 from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 
 BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
@@ -138,7 +139,9 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		html = frappe.get_print("Sales Invoice", invoice_name, no_letterhead=1)
+		html = frappe.get_print(
+			"Sales Invoice", invoice_name, print_format=BILL_FORMAT, no_letterhead=1
+		)
 		pdf = _pdf_without_what_it_cannot_fetch(html)
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
