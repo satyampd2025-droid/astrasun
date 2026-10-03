@@ -10,7 +10,7 @@ on:
     inputs:
       modules:
         description: "Test modules to run, space separated"
-        default: "test_load_changes"
+        default: "test_invoicing"
 
 concurrency:
   group: diagnose-stages
@@ -18,7 +18,7 @@ concurrency:
 
 env:
   ADMIN_PASSWORD: ci-admin-pass-1
-  MODULES: ${{ github.event.inputs.modules || 'test_load_changes' }}
+  MODULES: ${{ github.event.inputs.modules || 'test_invoicing' }}
 
 jobs:
   stages:
