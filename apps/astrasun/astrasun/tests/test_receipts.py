@@ -52,6 +52,7 @@ class TestReceipts(MillFixture):
 		self.assertEqual(receipts.to_settle(), [])
 		mine = self._summary(order, self.rep)
 		self.assertEqual((mine["paid"], mine["with_collector"], mine["remaining"]), (5000, 0, total - 5000))
+		frappe.set_user(self.owner)
 		with self.assertRaises(receipts.CollectionError):
 			receipts.settle([done[0]["name"]])  # already settled
 
@@ -89,7 +90,8 @@ class TestReceipts(MillFixture):
 			receipts.collect(order, 100)
 		self.assertEqual(receipts.my_collections()["orders"], [])
 		frappe.set_user(self.rep)
-		self.assertEqual([o["sales_order"] for o in receipts.my_collections()["orders"]], [order])
+		# Earlier tests leave their own orders behind, so look for this one among the rep's
+		self.assertIn(order, [o["sales_order"] for o in receipts.my_collections()["orders"]])
 
 	def test_a_driver_collects_on_orders_on_their_vehicle(self):
 		order, _inv, _total = self._billed_order()
@@ -98,7 +100,7 @@ class TestReceipts(MillFixture):
 		with self.assertRaises(frappe.PermissionError):
 			receipts.collect(order, 100)
 		frappe.set_user(self.driver)
-		self.assertEqual([o["sales_order"] for o in receipts.my_collections()["orders"]], [order])
+		self.assertIn(order, [o["sales_order"] for o in receipts.my_collections()["orders"]])
 		receipts.collect(order, 2500)
 		held = receipts.my_collections()
 		self.assertEqual(held["holding"], 2500)
