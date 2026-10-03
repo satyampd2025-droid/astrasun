@@ -25,4 +25,4 @@ def setup_bill_format():
 		frappe.db.set_value("Print Format", NAME, values)
 	else:
 		frappe.get_doc({"doctype": "Print Format", "name": NAME, **values}).insert(ignore_permissions=True)
-	make_property_setter("Sales Invoice", None, "default_print_format", NAME, "Data")
+	make_property_setter("Sales Invoice", None, "default_print_format", NAME, "Data", for_doctype=True)
