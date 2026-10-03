@@ -7,6 +7,8 @@ from astrasun.tests.helpers import MillFixture, _user
 class TestReceipts(MillFixture):
 	def setUp(self):
 		super().setUp()
+		# Collections from an earlier test must not show up in this one
+		frappe.db.delete("Mill Collection")
 		self.driver = "driver@example.com"
 		self.other_rep = _user("rep2@example.com", "Mill Sales")
 		self.accounts = _user("accounts@example.com", "Mill Accounts")

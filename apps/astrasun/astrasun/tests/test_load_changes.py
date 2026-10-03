@@ -26,6 +26,8 @@ class TestLoadChanges(MillFixture):
 
 	def test_the_bill_prints_as_a_pdf(self):
 		_, dn, _inv = self._billed()
+		# wkhtmltopdf fetches the print styles from the site's own address; point it at the running server
+		frappe.local.conf.host_name = "http://localhost:8000"
 		invoicing.bill_pdf(dn)
 		self.assertTrue(frappe.local.response.filecontent.startswith(b"%PDF"))
 		frappe.set_user(self.rep)
