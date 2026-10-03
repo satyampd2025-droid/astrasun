@@ -37,6 +37,11 @@ class LoadingError(frappe.ValidationError):
 	pass
 
 
+def edit_waiting(sales_order):
+	"""True while an edit to the order waits for the owner: nothing moves on it meanwhile."""
+	return bool(sales_order and frappe.db.get_value("Sales Order", sales_order, "astrasun_edit_json"))
+
+
 def _check_role():
 	if not set(frappe.get_roles()).intersection(LOADER_ROLES):
 		frappe.throw(_("Only warehouse staff can load orders"), frappe.PermissionError)
@@ -68,15 +73,15 @@ def _phone(dn):
 
 
 def _task(dn):
+	sales_order = dn.items[0].against_sales_order if dn.items else None
+	asked = dn.astrasun_change_status == CHANGE_REQUESTED or edit_waiting(sales_order)
 	return {
 		"name": dn.name,
-		"sales_order": dn.items[0].against_sales_order if dn.items else None,
+		"sales_order": sales_order,
 		"customer": dn.customer,
 		"customer_name": dn.customer_name,
 		"status": dn.astrasun_loading_status,
-		"stage": stages.WAITING
-		if dn.astrasun_change_status == CHANGE_REQUESTED
-		else stages.truck_stage(dn.astrasun_loading_status),
+		"stage": stages.WAITING if asked else stages.truck_stage(dn.astrasun_loading_status),
 		"vehicle_no": dn.astrasun_vehicle_no,
 		"driver_name": dn.astrasun_driver_name,
 		"driver_phone": dn.astrasun_driver_phone,
@@ -84,7 +89,7 @@ def _task(dn):
 		"customer_phone": _phone(dn),
 		"loaded_by": dn.astrasun_loaded_by,
 		"invoice": dn.astrasun_invoice,
-		"change_requested": dn.astrasun_change_status == CHANGE_REQUESTED,
+		"change_requested": asked,
 		"items": [
 			{
 				"item_code": r.item_code,
@@ -100,6 +105,7 @@ def _task(dn):
 
 def _waiting(so):
 	return {
+		"edit_waiting": bool(so.astrasun_edit_json),
 		"sales_order": so.name,
 		"customer": so.customer,
 		"customer_name": so.customer_name,
@@ -147,6 +153,8 @@ def start(sales_order, vehicle_no=None):
 	so = frappe.get_doc("Sales Order", sales_order)
 	if so.docstatus != 1 or so.astrasun_approval_status != "Approved":
 		frappe.throw(_("Only approved orders can be loaded"), LoadingError)
+	if edit_waiting(sales_order):
+		frappe.throw(_("An edit is waiting for the owner"), LoadingError)
 	if frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order, "docstatus": 0}):
 		frappe.throw(_("This order is already being loaded"), LoadingError)
 	# Warehouse staff cannot read accounts, which ERPNext needs to fill in the note.
@@ -171,7 +179,7 @@ def mark_loaded(name, vehicle_no, items=None):
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADING:
 		frappe.throw(_("This loading task is not open"), LoadingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or edit_waiting(dn.items[0].against_sales_order):
 		frappe.throw(_("A change is waiting for the owner"), LoadingError)
 	if items:
 		items = json.loads(items) if isinstance(items, str) else items

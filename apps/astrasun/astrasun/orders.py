@@ -14,6 +14,7 @@ out from its trucks and bills, see `stages.py`.
 """
 
 import json
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -23,6 +24,7 @@ from astrasun import audit, receipts, stages
 
 APPROVER_ROLES = ("Mill Owner", "Mill Manager")
 OWNER_ROLE = "Mill Owner"
+EDITOR_ROLES = ("Mill Warehouse", "Mill Dispatch")
 
 DRAFT, PENDING, APPROVED, REJECTED, SENT_BACK = (
 	"Draft",
@@ -34,6 +36,10 @@ DRAFT, PENDING, APPROVED, REJECTED, SENT_BACK = (
 
 
 class SelfApprovalError(frappe.ValidationError):
+	pass
+
+
+class EditError(frappe.ValidationError):
 	pass
 
 
@@ -160,6 +166,11 @@ def _approver_check(doc):
 	roles = set(frappe.get_roles())
 	if not roles.intersection(APPROVER_ROLES):
 		frappe.throw(_("Only the owner or a manager can decide on orders"), frappe.PermissionError)
+	if doc.docstatus == 1 and doc.astrasun_edit_json:
+		# An edit to an approved order: whoever asked for it cannot approve it
+		if frappe.session.user == doc.astrasun_edit_by:
+			frappe.throw(_("You cannot approve your own order"), SelfApprovalError)
+		return roles
 	if frappe.session.user in (doc.astrasun_submitted_by, doc.owner):
 		frappe.throw(_("You cannot approve your own order"), SelfApprovalError)
 	if doc.astrasun_approval_status != PENDING:
@@ -171,6 +182,8 @@ def _approver_check(doc):
 def approve(name, note=None):
 	doc = frappe.get_doc("Sales Order", name)
 	roles = _approver_check(doc)
+	if doc.docstatus == 1:
+		return _approve_edit(doc, note)
 	if doc.astrasun_credit_breach and OWNER_ROLE not in roles:
 		frappe.throw(
 			_("This order is over the customer's credit limit. Only the owner can approve it."),
@@ -209,11 +222,194 @@ def _decide(name, status, reason):
 		frappe.throw(_("Please give a reason"), audit.ReasonRequiredError)
 	doc = frappe.get_doc("Sales Order", name)
 	_approver_check(doc)
+	if doc.docstatus == 1:
+		return _turn_down_edit(doc, reason)
 	doc.astrasun_approval_status = status
 	doc.astrasun_approved_by = frappe.session.user
 	doc.astrasun_approval_note = reason
 	doc.save()
 	audit.log(doc, "Approval", f"{status}: {reason}")
+	return summary(doc)
+
+
+def _clear_edit(doc):
+	with _as_system():
+		doc.db_set(
+			{"astrasun_edit_json": None, "astrasun_edit_note": None, "astrasun_edit_by": None},
+			update_modified=False,
+		)
+
+
+def _turn_down_edit(doc, reason):
+	asked = doc.astrasun_edit_note
+	_clear_edit(doc)
+	audit.log(doc, "Approval", f"Edit turned down: {reason} (asked: {asked})")
+	doc.reload()
+	return summary(doc)
+
+
+def _approve_edit(doc, note):
+	"""Put the edited items on the approved order, taking back any bill and load made from the old ones."""
+	payload = json.loads(doc.astrasun_edit_json)
+	reason = doc.astrasun_edit_note
+	existing = {r.item_code: r for r in doc.items}
+	with _as_system():
+		for name in frappe.get_all(
+			"Delivery Note Item",
+			filters={"against_sales_order": doc.name, "docstatus": 0},
+			pluck="parent",
+			distinct=True,
+		):
+			dn = frappe.get_doc("Delivery Note", name)
+			if dn.astrasun_invoice:
+				si = frappe.get_doc("Sales Invoice", dn.astrasun_invoice)
+				si.flags.change_reason = f"Order edited: {reason}"
+				si.cancel()
+				dn.db_set("astrasun_invoice", None)
+			frappe.delete_doc("Delivery Note", name, force=1, ignore_permissions=True)
+		from erpnext.controllers.accounts_controller import update_child_qty_and_rate
+
+		rows = [
+			{
+				"docname": existing[i["item_code"]].name if i["item_code"] in existing else None,
+				"item_code": i["item_code"],
+				"qty": flt(i["qty"]),
+				"rate": flt(i["rate"]),
+				"delivery_date": payload.get("delivery_date") or str(doc.delivery_date),
+				"uom": frappe.db.get_value("Item", i["item_code"], "stock_uom"),
+				"conversion_factor": 1,
+			}
+			for i in payload["items"]
+		]
+		update_child_qty_and_rate("Sales Order", json.dumps(rows), doc.name)
+		doc.reload()
+		if payload.get("delivery_date"):
+			doc.db_set("delivery_date", payload["delivery_date"], update_modified=False)
+		_check(doc)
+		doc.astrasun_approved_by = frappe.session.user
+		doc.astrasun_approval_note = note
+		doc.astrasun_edit_json = None
+		doc.astrasun_edit_note = None
+		doc.astrasun_edit_by = None
+		doc.save()
+	audit.log(doc, "Approval", f"Edit approved: {reason}" + (f" ({note})" if note else ""))
+	doc.reload()
+	return summary(doc)
+
+
+@contextmanager
+def _as_system():
+	user = frappe.session.user
+	frappe.set_user("Administrator")
+	try:
+		yield
+	finally:
+		frappe.set_user(user)
+
+
+def _left(name):
+	"""True once any truck of this order has left: a Delivery Note was submitted for it."""
+	return bool(frappe.db.exists("Delivery Note Item", {"against_sales_order": name, "docstatus": 1}))
+
+
+def can_edit(doc):
+	"""Whether the order may still be edited: not cancelled, not turned down, not waiting, no truck left."""
+	if doc.docstatus == 2 or doc.astrasun_approval_status in (REJECTED,):
+		return False
+	if doc.astrasun_edit_json:
+		return False
+	return not (doc.docstatus == 1 and _left(doc.name))
+
+
+@frappe.whitelist()
+def edit_order(name, items, reason, delivery_date=None):
+	"""The rep or the warehouse changes an order: items, bags and date.
+
+	Every edit goes to the owner. Before the owner has approved the order it simply goes back to
+	Waiting for approval; once approved the old order stands until the owner approves the edit.
+	Nothing can be edited after a truck has left.
+	"""
+	roles = set(frappe.get_roles())
+	doc = frappe.get_doc("Sales Order", name)
+	user = frappe.session.user
+	rep = "Mill Sales" in roles and user in (doc.astrasun_submitted_by, doc.owner)
+	if not (rep or roles.intersection(EDITOR_ROLES)):
+		frappe.throw(_("You cannot edit this order"), frappe.PermissionError)
+	reason = (reason or "").strip()
+	if not reason:
+		frappe.throw(_("Give a reason for the edit"), EditError)
+	if doc.docstatus == 2 or doc.astrasun_approval_status == REJECTED:
+		frappe.throw(_("This order was cancelled or turned down"), EditError)
+	if doc.astrasun_edit_json:
+		frappe.throw(_("An edit is already waiting for the owner"), EditError)
+	if doc.docstatus == 1 and _left(name):
+		frappe.throw(_("A truck has already left with this order. It cannot be edited."), EditError)
+	items = json.loads(items) if isinstance(items, str) else items
+	wanted = {}
+	for row in items or []:
+		qty = flt(row["qty"])
+		if qty <= 0:
+			continue
+		code = row["item_code"]
+		if not frappe.db.exists("Item", {"name": code, "disabled": 0}):
+			frappe.throw(_("{0} is not an item that can be sold").format(code), EditError)
+		old = next((r for r in doc.items if r.item_code == code), None)
+		rate = row.get("rate")
+		if rate is None:
+			rate = old.rate if old else frappe.db.get_value(
+				"Item Price", {"item_code": code, "selling": 1}, "price_list_rate"
+			)
+		qty += wanted[code]["qty"] if code in wanted else 0
+		wanted[code] = {"item_code": code, "qty": qty, "rate": flt(rate)}
+	if not wanted:
+		frappe.throw(_("Nothing is left on the order. Ask the owner to cancel it instead."), EditError)
+	date = str(delivery_date or doc.delivery_date)
+	if doc.docstatus == 0:
+		doc.items = []
+		for row in wanted.values():
+			doc.append(
+				"items",
+				{
+					"item_code": row["item_code"],
+					"qty": row["qty"],
+					"rate": row["rate"],
+					"delivery_date": date,
+					"warehouse": _warehouse(row["item_code"], doc.company),
+				},
+			)
+		doc.delivery_date = date
+		with _as_system():
+			doc.astrasun_approval_status = PENDING
+			doc.astrasun_submitted_by = user
+			doc.astrasun_approval_note = None
+			doc.save()
+			_check(doc)
+			doc.save()
+		audit.log(doc, "Approval", f"Order edited before approval: {reason}")
+		doc.reload()
+		return summary(doc)
+	with _as_system():
+		doc.db_set(
+			{
+				"astrasun_edit_json": json.dumps({"items": list(wanted.values()), "delivery_date": date}),
+				"astrasun_edit_note": reason,
+				"astrasun_edit_by": user,
+			},
+			update_modified=True,
+		)
+	audit.log(doc, "Approval", f"Edit asked: {reason}")
+	doc.reload()
+	return summary(doc)
+
+
+@frappe.whitelist()
+def get_order(name):
+	"""One order as the phone shows it, for the people who may edit it."""
+	roles = set(frappe.get_roles())
+	doc = frappe.get_doc("Sales Order", name)
+	mine = frappe.session.user in (doc.astrasun_submitted_by, doc.owner)
+	if not (mine or roles.intersection((*EDITOR_ROLES, *APPROVER_ROLES))):
+		frappe.throw(_("You cannot see this order"), frappe.PermissionError)
 	return summary(doc)
 
 
@@ -290,8 +486,9 @@ def summary(doc, facts=None):
 		# Money collected but not yet handed in already counts as paid on the order
 		outstanding=max(fact["outstanding"] - fact["pending"], 0),
 		cancelled=doc.docstatus == 2,
-		change_pending=fact["change"],
+		change_pending=fact["change"] or bool(doc.astrasun_edit_json),
 	)
+	edit = json.loads(doc.astrasun_edit_json) if doc.astrasun_edit_json else None
 	return {
 		"name": doc.name,
 		"customer": doc.customer,
@@ -315,6 +512,22 @@ def summary(doc, facts=None):
 		"credit_breach": bool(doc.astrasun_credit_breach),
 		"stock_short": bool(doc.astrasun_stock_short),
 		"below_min_price": bool(doc.astrasun_below_price),
+		"can_edit": can_edit(doc),
+		"edit": edit
+		and {
+			"by": doc.astrasun_edit_by,
+			"reason": doc.astrasun_edit_note,
+			"delivery_date": edit.get("delivery_date"),
+			"items": [
+				{
+					"item_code": i["item_code"],
+					"item_name": frappe.db.get_value("Item", i["item_code"], "item_name"),
+					"qty": flt(i["qty"]),
+					"rate": flt(i["rate"]),
+				}
+				for i in edit["items"]
+			],
+		},
 		"items": [
 			{"item_code": r.item_code, "item_name": r.item_name, "qty": flt(r.qty), "rate": flt(r.rate)}
 			for r in doc.items
@@ -350,7 +563,13 @@ def pending_approvals():
 		order_by="creation asc",
 		pluck="name",
 	)
-	return _summaries(names)
+	edits = frappe.get_all(
+		"Sales Order",
+		filters={"astrasun_edit_json": ["is", "set"], "docstatus": 1},
+		order_by="modified asc",
+		pluck="name",
+	)
+	return _summaries(names + edits)
 
 
 @frappe.whitelist()
