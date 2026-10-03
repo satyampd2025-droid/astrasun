@@ -64,13 +64,16 @@ def truck_stage(loading_status):
 	return _TRUCK.get(loading_status, loading_status)
 
 
-def _stage(approval, trucks, fully_delivered, billed, outstanding, cancelled):
+def _stage(approval, trucks, fully_delivered, billed, outstanding, cancelled, change_pending=False):
 	if cancelled:
 		return CANCELLED
 	if approval == "Pending Approval":
 		return WAITING
 	if approval != "Approved":
 		return approval or DRAFT
+	if change_pending:
+		# The warehouse asked to change the order: it waits for the owner again
+		return WAITING
 	active = [t for t in trucks if t in _ON_THE_ROAD_TO_DELIVERY]
 	if active:
 		# The truck furthest behind says where the order is
@@ -100,13 +103,16 @@ def _timeline(stage, step):
 	return rows
 
 
-def describe(approval, trucks=(), fully_delivered=False, billed=0, outstanding=0, cancelled=False):
+def describe(
+	approval, trucks=(), fully_delivered=False, billed=0, outstanding=0, cancelled=False, change_pending=False
+):
 	"""The stage of an order, its colour, its place on the ladder and the timeline rows.
 
 	`trucks` are the loading statuses of the order's Delivery Notes; `billed` and
-	`outstanding` add up its submitted invoices.
+	`outstanding` add up its submitted invoices; `change_pending` is a load change
+	waiting for the owner.
 	"""
-	stage = _stage(approval, trucks, fully_delivered, billed, outstanding, cancelled)
+	stage = _stage(approval, trucks, fully_delivered, billed, outstanding, cancelled, change_pending)
 	step = _STEP.get(stage, 0)
 	return {
 		"stage": stage,
