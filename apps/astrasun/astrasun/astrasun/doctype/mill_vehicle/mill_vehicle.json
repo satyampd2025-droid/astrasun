@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:vehicle_no",
+ "creation": "2026-10-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "vehicle_no",
+  "enabled",
+  "column_break_1",
+  "driver_name",
+  "driver_phone",
+  "driver_user"
+ ],
+ "fields": [
+  {
+   "fieldname": "vehicle_no",
+   "label": "Vehicle Number",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "enabled",
+   "label": "Available",
+   "fieldtype": "Check",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver_name",
+   "label": "Driver or Contact Person",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "driver_phone",
+   "label": "Driver Phone",
+   "fieldtype": "Data",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "driver_user",
+   "label": "Driver's App Login",
+   "fieldtype": "Link",
+   "options": "User",
+   "description": "The user who logs in to the phone app as this vehicle's driver. Optional."
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Astrasun",
+ "name": "Mill Vehicle",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Mill Owner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Mill Warehouse",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Mill Dispatch",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Mill Driver",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Mill Auditor",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "vehicle_no",
+ "track_changes": 1
+}
