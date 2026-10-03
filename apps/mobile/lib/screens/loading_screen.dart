@@ -6,7 +6,7 @@ import '../print_bill.dart';
 import '../strings.dart';
 import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
-import '../widgets/voice_text_field.dart';
+import 'edit_order_screen.dart';
 
 /// Warehouse: approved orders to load onto trucks.
 class LoadingScreen extends StatefulWidget {
@@ -81,6 +81,29 @@ class _LoadingScreenState extends State<LoadingScreen> {
     _reload();
   }
 
+  /// The warehouse edits the whole order; the owner has to approve.
+  Future<void> _edit(LoadingTask t) async {
+    final s = S.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final order = await widget.client.order(t.salesOrder);
+      if (!mounted) return;
+      final done = await Navigator.of(context).push<Order>(
+        MaterialPageRoute(
+          builder: (_) => EditOrderScreen(client: widget.client, order: order),
+        ),
+      );
+      if (done != null) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(s.t('Change sent to the owner'))),
+        );
+      }
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
+    }
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -101,12 +124,18 @@ class _LoadingScreenState extends State<LoadingScreen> {
               task: t,
               vehicles: _vehicles,
               onStart: () => _run(() => widget.client.startLoading(t)),
-              onLoaded: (vehicle, loaded) =>
-                  _run(() => widget.client.markLoaded(t, vehicle, loaded)),
+              loadBatches: widget.client.batchesInStock,
+              onLoaded: (vehicle, loaded, batches) => _run(
+                () => widget.client.markLoaded(
+                  t,
+                  vehicle,
+                  loaded,
+                  batches: batches,
+                ),
+              ),
               onPrint: () => _printBill(t),
               onLeft: () => _run(() => widget.client.dispatchTruck(t)),
-              onChange: (bags, reason) =>
-                  _run(() => widget.client.requestLoadChange(t, bags, reason)),
+              onChange: () => _edit(t),
             ),
         ],
       ),
@@ -120,6 +149,7 @@ class _TaskCard extends StatefulWidget {
     required this.task,
     required this.vehicles,
     required this.onStart,
+    required this.loadBatches,
     required this.onLoaded,
     required this.onPrint,
     required this.onLeft,
@@ -128,10 +158,16 @@ class _TaskCard extends StatefulWidget {
   final LoadingTask task;
   final List<Vehicle> vehicles;
   final VoidCallback onStart;
-  final void Function(String vehicle, Map<String, int> loaded) onLoaded;
+  final Future<List<BatchStock>> Function(String itemCode) loadBatches;
+  final void Function(
+    String vehicle,
+    Map<String, int> loaded,
+    Map<String, String> batches,
+  )
+  onLoaded;
   final VoidCallback onPrint;
   final VoidCallback onLeft;
-  final void Function(Map<String, int> bags, String reason) onChange;
+  final VoidCallback onChange;
 
   @override
   State<_TaskCard> createState() => _TaskCardState();
@@ -143,103 +179,43 @@ class _TaskCardState extends State<_TaskCard> {
       ? widget.task.vehicleNo
       : null;
   bool _missing = false;
+  bool _batchMissing = false;
 
-  void _finish() {
-    if (_vehicle == null) {
-      setState(() => _missing = true);
-      return;
+  /// Batches in stock per item, and the one the warehouse chose for each.
+  final Map<String, List<BatchStock>> _stock = {};
+  final Map<String, String> _batch = {};
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.task.status != 'Loading') return;
+    for (final i in widget.task.items) {
+      widget
+          .loadBatches(i.itemCode)
+          .then((b) {
+            if (mounted) setState(() => _stock[i.itemCode] = b);
+          })
+          .catchError((_) {});
     }
-    widget.onLoaded(_vehicle!, {
-      for (final i in widget.task.items) i.itemCode: i.qty.round(),
-    });
   }
 
-  /// After the bill is printed the bags can still change, with the owner's approval.
-  Future<void> _askChange() async {
-    final s = S.of(context);
-    final fields = {
-      for (final i in widget.task.items)
-        i.itemCode: TextEditingController(text: '${i.qty.round()}'),
-    };
-    final reason = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setLocal) => AlertDialog(
-          title: Text(s.t('Change order')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final i in widget.task.items)
-                  Row(
-                    children: [
-                      Expanded(child: Text(i.itemName)),
-                      SizedBox(
-                        width: 90,
-                        child: TextField(
-                          key: Key('change-qty-${i.itemCode}'),
-                          controller: fields[i.itemCode],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                            suffixText: '/ ${i.qty.round()}',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                VoiceTextField(
-                  key: const Key('change-reason'),
-                  controller: reason,
-                  label: s.t('Reason'),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  s.t(
-                    'The order goes back to the owner for approval. A printed bill is cancelled and you print a new one.',
-                  ),
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(s.t('Back')),
-            ),
-            FilledButton(
-              key: const Key('change-send'),
-              onPressed: () {
-                final over = widget.task.items.any((i) {
-                  final q = int.tryParse(fields[i.itemCode]!.text.trim());
-                  return q == null || q < 0 || q > i.qty.round();
-                });
-                if (over) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        s.t('Bags cannot be more than the order asks for'),
-                      ),
-                    ),
-                  );
-                } else if (reason.text.trim().isNotEmpty) {
-                  Navigator.pop(context, true);
-                }
-              },
-              child: Text(s.t('Send to the owner')),
-            ),
-          ],
-        ),
-      ),
+  void _finish() {
+    final noBatch = widget.task.items.any(
+      (i) =>
+          (_stock[i.itemCode] ?? []).isNotEmpty && _batch[i.itemCode] == null,
     );
-    if (ok == true) {
-      widget.onChange({
-        for (final i in widget.task.items)
-          i.itemCode: int.parse(fields[i.itemCode]!.text.trim()),
-      }, reason.text.trim());
+    if (_vehicle == null || noBatch) {
+      setState(() {
+        _missing = _vehicle == null;
+        _batchMissing = noBatch;
+      });
+      return;
     }
+    widget.onLoaded(
+      _vehicle!,
+      {for (final i in widget.task.items) i.itemCode: i.qty.round()},
+      {..._batch},
+    );
   }
 
   @override
@@ -321,7 +297,7 @@ class _TaskCardState extends State<_TaskCard> {
                 ],
               ],
             ],
-            if ((loading || t.status == 'Loaded') && t.changeRequested)
+            if (t.changeRequested)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -330,14 +306,52 @@ class _TaskCardState extends State<_TaskCard> {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               )
-            else if (loading || t.status == 'Loaded')
+            else
               TextButton.icon(
                 key: Key('change-${t.id}'),
                 icon: const Icon(Icons.edit_outlined),
                 label: Text(s.t('Change order')),
-                onPressed: _askChange,
+                onPressed: widget.onChange,
               ),
             if (loading && !t.changeRequested) ...[
+              for (final i in t.items)
+                if ((_stock[i.itemCode] ?? []).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: DropdownButtonFormField<String>(
+                      key: Key('batch-${t.id}-${i.itemCode}'),
+                      initialValue: _batch[i.itemCode],
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '${s.t('Batch')} - ${i.itemName}',
+                      ),
+                      items: [
+                        for (final b in _stock[i.itemCode]!)
+                          DropdownMenuItem(
+                            value: b.batchNo,
+                            enabled: b.qty >= i.qty,
+                            child: Text(
+                              '${b.batchNo} (${b.qty.round()} ${s.t('bags')})',
+                            ),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _batch[i.itemCode] = v!;
+                        _batchMissing = false;
+                      }),
+                    ),
+                  ),
+              if (_batchMissing)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    s.t('Pick the batch'),
+                    key: Key('batch-missing-${t.id}'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
               if (widget.vehicles.isEmpty)
                 Text(
                   s.t('No vehicles yet. Ask the owner to add them.'),

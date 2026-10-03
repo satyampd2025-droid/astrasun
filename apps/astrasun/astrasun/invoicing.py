@@ -5,16 +5,28 @@ Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
 which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
+import re
+
 import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
+from frappe.utils.pdf import get_pdf
 
 from astrasun import audit
+from astrasun.setup.print_format import NAME as BILL_FORMAT
 from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 
 BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
 DISPATCH_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 DISPATCHED = "Dispatched"
+# The mill prints its bills on A5
+PAGE = {
+	"page-size": "A5",
+	"margin-top": "7mm",
+	"margin-bottom": "7mm",
+	"margin-left": "7mm",
+	"margin-right": "7mm",
+}
 
 
 class InvoicingError(frappe.ValidationError):
@@ -68,6 +80,12 @@ def to_dispatch():
 	return [_view(frappe.get_doc("Delivery Note", n)) for n in names]
 
 
+def _edit_waiting(dn):
+	return bool(
+		dn.items and frappe.db.get_value("Sales Order", dn.items[0].against_sales_order, "astrasun_edit_json")
+	)
+
+
 @frappe.whitelist()
 def invoice(name):
 	"""Print bill: bill a loaded truck from the bags actually loaded."""
@@ -79,10 +97,12 @@ def invoice(name):
 		frappe.throw(_("Only a loaded truck can be invoiced"), InvoicingError)
 	if dn.astrasun_invoice:
 		frappe.throw(_("This truck is already invoiced"), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 
-	loaded = {r.so_detail: flt(r.qty) for r in dn.items}
+	loaded = {}
+	for r in dn.items:
+		loaded[r.so_detail] = loaded.get(r.so_detail, 0) + flt(r.qty)
 	sales_order = dn.items[0].against_sales_order
 	with _as_system():
 		si = make_sales_invoice(sales_order)
@@ -100,6 +120,26 @@ def invoice(name):
 	return _view(dn)
 
 
+def _pdf_without_what_it_cannot_fetch(html):
+	"""The PDF tool runs inside the server and fetches pictures and styles by their web address. When
+	that fails (a logo that is gone, a server it cannot reach) the whole bill fails, so it tries again
+	without the pictures, then without the linked styles and scripts too."""
+	steps = (
+		None,
+		(r"<img\b[^>]*>",),
+		(r"<img\b[^>]*>", r"<link\b[^>]*>", r"<script\b[^>]*\bsrc=[^>]*>\s*</script>"),
+	)
+	for patterns in steps:
+		body = html
+		for pattern in patterns or ():
+			body = re.sub(pattern, "", body, flags=re.I)
+		try:
+			return get_pdf(body, PAGE)
+		except (OSError, frappe.ValidationError):
+			if patterns is steps[-1]:
+				raise
+
+
 @frappe.whitelist()
 def bill_pdf(name):
 	"""The truck's bill as a PDF, for the phone to print."""
@@ -108,10 +148,22 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		pdf = frappe.get_print("Sales Invoice", invoice_name, as_pdf=True)
+		html = frappe.get_print("Sales Invoice", invoice_name, print_format=BILL_FORMAT, no_letterhead=1)
+		pdf = _pdf_without_what_it_cannot_fetch(html)
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"
+
+
+def _needs_batch(dn):
+	"""The bag items on this truck that still have no batch chosen."""
+	return [
+		r.item_code
+		for r in dn.items
+		if not r.batch_no
+		and not r.serial_and_batch_bundle
+		and frappe.db.get_value("Item", r.item_code, "has_batch_no")
+	]
 
 
 @frappe.whitelist()
@@ -123,8 +175,14 @@ def dispatch(name):
 		frappe.throw(_("This truck is not ready to leave"), InvoicingError)
 	if not dn.astrasun_invoice:
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
+	missing = [] if frappe.flags.in_test else _needs_batch(dn)  # ERPNext skips its own check while testing
+	if missing:
+		frappe.throw(
+			_("Choose the batch for {0} before the truck leaves").format(", ".join(sorted(set(missing)))),
+			InvoicingError,
+		)
 	with _as_system():
 		dn.astrasun_loading_status = DISPATCHED
 		dn.save()

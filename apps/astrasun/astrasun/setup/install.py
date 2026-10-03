@@ -4,6 +4,7 @@ from astrasun.audit import setup_custom_fields
 from astrasun.setup.masters import setup_mill
 from astrasun.setup.loading import setup_loading_fields
 from astrasun.setup.orders import setup_order_fields
+from astrasun.setup.print_format import setup_bill_format
 from astrasun.setup.roles import setup_roles, sync_users
 
 
@@ -12,6 +13,7 @@ def after_install():
 	setup_custom_fields()
 	setup_order_fields()
 	setup_loading_fields()
+	setup_bill_format()
 	for company in frappe.get_all("Company", pluck="name"):
 		setup_mill(company)
 
@@ -22,6 +24,7 @@ def after_migrate():
 	setup_custom_fields()
 	setup_order_fields()
 	setup_loading_fields()
+	setup_bill_format()
 
 
 def setup_wizard_complete(args=None):

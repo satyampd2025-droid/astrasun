@@ -8,45 +8,45 @@ import '../widgets/order_card.dart';
 import '../widgets/order_line_tile.dart';
 import '../widgets/voice_text_field.dart';
 
-/// Sales rep: pick customer, pick bags, set quantity, send for approval.
-class NewOrderScreen extends StatefulWidget {
-  const NewOrderScreen({super.key, required this.client});
+/// The sales rep or the warehouse changes an order: bags, items taken off or
+/// added. The owner approves the change; nothing can be edited once a truck has left.
+/// Pops with the order the server sent back.
+class EditOrderScreen extends StatefulWidget {
+  const EditOrderScreen({super.key, required this.client, required this.order});
   final ErpNextClient client;
+  final Order order;
 
   @override
-  State<NewOrderScreen> createState() => _NewOrderScreenState();
+  State<EditOrderScreen> createState() => _EditOrderScreenState();
 }
 
-class _NewOrderScreenState extends State<NewOrderScreen> {
+class _EditOrderScreenState extends State<EditOrderScreen> {
   late final Future<Catalog> _catalog = widget.client.catalog();
-  final _remarks = TextEditingController();
-  final _lines = <OrderLine>[];
-  Customer? _customer;
+  final _reason = TextEditingController();
+  late final List<OrderLine> _lines = [
+    for (final i in widget.order.items)
+      OrderLine(
+        CatalogItem(i.itemCode, i.itemName, i.rate),
+        qty: i.qty.round(),
+        rate: i.rate,
+      ),
+  ];
   bool _busy = false;
-  Order? _sent;
   String? _error;
 
-  double get _total => _lines.fold(0, (sum, l) => sum + l.amount);
-
-  Future<void> _send() async {
-    final s = S.of(context);
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final order = await widget.client.createOrder(
-        _customer!,
-        _lines,
-        _remarks.text.trim(),
-      );
-      setState(() => _sent = order);
-    } on Exception catch (e) {
-      setState(() => _error = s.saveFailed(e));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  @override
+  void initState() {
+    super.initState();
+    _reason.addListener(() => setState(() {}));
   }
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  double get _total => _lines.fold(0, (sum, l) => sum + l.amount);
 
   Future<void> _addItem(Catalog catalog) async {
     final item = await showModalBottomSheet<CatalogItem>(
@@ -75,30 +75,31 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     });
   }
 
-  Future<void> _pickCustomer(Catalog catalog) async {
-    final c = await showModalBottomSheet<Customer>(
-      context: context,
-      builder: (context) => ListView(
-        children: [
-          for (final c in catalog.customers)
-            ListTile(
-              key: Key('customer-${c.name}'),
-              minTileHeight: 64,
-              title: Text(c.displayName, style: const TextStyle(fontSize: 20)),
-              onTap: () => Navigator.pop(context, c),
-            ),
-        ],
-      ),
-    );
-    if (c != null) setState(() => _customer = c);
+  Future<void> _send() async {
+    final s = S.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final done = await widget.client.editOrder(
+        widget.order,
+        _lines,
+        _reason.text.trim(),
+      );
+      if (mounted) Navigator.of(context).pop(done);
+    } on Exception catch (e) {
+      if (mounted) setState(() => _error = s.saveFailed(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    if (_sent != null) return _SentView(order: _sent!);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('New order'))),
+      appBar: AppBar(title: Text(s.t('Change order'))),
       body: FutureBuilder<Catalog>(
         future: _catalog,
         builder: (context, snap) {
@@ -110,20 +111,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              OutlinedButton.icon(
-                key: const Key('pick-customer'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(64),
-                  alignment: Alignment.centerLeft,
-                ),
-                icon: const Icon(Icons.storefront_outlined),
-                label: Text(
-                  _customer?.displayName ?? s.t('Choose customer'),
-                  style: const TextStyle(fontSize: 20),
-                ),
-                onPressed: () => _pickCustomer(catalog),
+              Text(
+                widget.order.customerName,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               for (final l in _lines)
                 OrderLineTile(
                   line: l,
@@ -143,12 +135,22 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 onPressed: () => _addItem(catalog),
               ),
               const SizedBox(height: 16),
-              VoiceTextField(controller: _remarks, label: s.t('Remarks')),
+              VoiceTextField(
+                key: const Key('edit-reason'),
+                controller: _reason,
+                label: s.t('Reason'),
+              ),
               const SizedBox(height: 16),
               Text(
                 '${s.t('Total')}: ${rupees(_total)}',
                 key: const Key('total'),
                 style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                s.t(
+                  'The order goes to the owner for approval. A printed bill is cancelled and loading starts again.',
+                ),
               ),
               if (_error != null)
                 Padding(
@@ -162,52 +164,18 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 ),
               const SizedBox(height: 16),
               FilledButton(
-                key: const Key('send-order'),
-                onPressed: _busy || _customer == null || _lines.isEmpty
+                key: const Key('send-edit'),
+                onPressed:
+                    _busy || _lines.isEmpty || _reason.text.trim().isEmpty
                     ? null
                     : _send,
                 child: _busy
                     ? const CircularProgressIndicator()
-                    : Text(s.t('Send for approval')),
+                    : Text(s.t('Send to the owner')),
               ),
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _SentView extends StatelessWidget {
-  const _SentView({required this.order});
-  final Order order;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(s.t('New order'))),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Icon(
-            Icons.check_circle,
-            size: 72,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          Text(
-            s.t('Sent for approval'),
-            key: const Key('sent'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 16),
-          OrderCard(order: order),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(s.t('Back')),
-          ),
-        ],
       ),
     );
   }

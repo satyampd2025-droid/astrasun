@@ -134,6 +134,33 @@ class OrderCard extends StatelessWidget {
                   ]),
                 ),
               ],
+              if (order.edit != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  key: Key('edit-${order.name}'),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4D6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.t('Change asked'),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      for (final i in order.edit!.items)
+                        Text(
+                          '${i.itemName} × ${i.qty.round()}  @ ${rupees(i.rate)}',
+                        ),
+                      if (order.edit!.reason.isNotEmpty)
+                        Text('“${order.edit!.reason}”'),
+                    ],
+                  ),
+                ),
+              ],
               if ((order.note ?? '').isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text('“${order.note}”'),

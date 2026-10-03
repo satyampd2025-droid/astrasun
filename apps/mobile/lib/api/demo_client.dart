@@ -173,19 +173,94 @@ class DemoClient extends ErpNextClient {
     return order;
   }
 
+  /// The demo lets an order be edited until its truck is on the way.
+  Order _editable(Order o) => o.copyWith(
+    canEdit:
+        o.edit == null &&
+        const [
+          'Waiting for approval',
+          'Approved',
+          'Loading',
+          'Loaded',
+        ].contains(o.stage),
+  );
+
   @override
-  Future<List<Order>> myOrders() async => List.of(_orders);
+  Future<List<Order>> myOrders() async => [
+    for (final o in _orders) _editable(o),
+  ];
+
+  /// The order behind a loading job. The demo's own first job has none, so it is made when asked for.
+  Order _orderOf(String name) {
+    final known = _orders.where((o) => o.name == name);
+    if (known.isNotEmpty) return known.first;
+    final task = _loading.firstWhere((t) => t.salesOrder == name);
+    final order = _at(
+      Order(
+        name: name,
+        customerName: task.customerName,
+        status: 'Approved',
+        total: task.items.fold<double>(0, (sum, i) => sum + i.qty * i.rate),
+        items: task.items,
+      ),
+      2,
+    );
+    _orders.add(order);
+    return order;
+  }
+
+  @override
+  Future<Order> order(String name) async => _editable(_orderOf(name));
+
+  @override
+  Future<Order> editOrder(
+    Order order,
+    List<OrderLine> lines,
+    String reason,
+  ) async {
+    if (reason.trim().isEmpty) throw Exception('reason');
+    final items = [
+      for (final l in lines)
+        OrderItem(
+          itemCode: l.item.code,
+          itemName: l.item.name,
+          qty: l.qty.toDouble(),
+          rate: l.rate,
+        ),
+    ];
+    _orderOf(order.name);
+    return _change(order.name, (o) {
+      if (o.status == 'Approved') {
+        // The old order stands until the owner approves the edit
+        for (final t in _loading.where((t) => t.salesOrder == o.name)) {
+          _setTask(t.id, (t) => t.copyWith(changeRequested: true));
+        }
+        return o.copyWith(
+          stage: 'Waiting for approval',
+          tone: 'wait',
+          timeline: _rows(1, _ladder[0]),
+          edit: OrderEdit(by: 'demo', reason: reason.trim(), items: items),
+        );
+      }
+      return _at(
+        o.copyWith(items: items),
+        1,
+        tone: 'wait',
+        status: 'Pending Approval',
+      );
+    });
+  }
 
   @override
   Future<List<Order>> allOrders() async => [
     for (final o in _orders)
-      if (o.status != 'Draft') o,
+      if (o.status != 'Draft') _editable(o),
   ];
 
   @override
   Future<List<Order>> pendingApprovals() async => [
     for (final o in _orders)
-      if (o.status == 'Pending Approval') o,
+      if (o.status == 'Pending Approval' || o.edit != null) o,
   ];
 
   Order _change(String name, Order Function(Order) change) {
@@ -208,6 +283,27 @@ class DemoClient extends ErpNextClient {
 
   @override
   Future<Order> approve(String name) async {
+    final edit = _orders.firstWhere((o) => o.name == name).edit;
+    if (edit != null) {
+      // The edit goes on the order and its old load starts again
+      _loading.removeWhere((t) => t.salesOrder == name);
+      final done = _change(
+        name,
+        (o) => _at(o.copyWith(items: edit.items, clearEdit: true), 2),
+      );
+      _loading.add(
+        LoadingTask(
+          id: done.name,
+          salesOrder: done.name,
+          customerName: done.customerName,
+          status: 'Waiting',
+          address: 'Main Bazaar, Indore',
+          customerPhone: '9800000002',
+          items: done.items,
+        ),
+      );
+      return done;
+    }
     final done = _change(name, (o) => _at(o, 2, status: 'Approved'));
     _loading.add(
       LoadingTask(
@@ -315,11 +411,18 @@ class DemoClient extends ErpNextClient {
   }
 
   @override
+  Future<List<BatchStock>> batchesInStock(String itemCode) async => const [
+    BatchStock(batchNo: 'PK-DEMO-2026-00001', qty: 200),
+    BatchStock(batchNo: 'PK-DEMO-2026-00002', qty: 60),
+  ];
+
+  @override
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
-    Map<String, int> loaded,
-  ) async {
+    Map<String, int> loaded, {
+    Map<String, String> batches = const {},
+  }) async {
     final vehicle = _vehicles.firstWhere(
       (v) => v.enabled && v.vehicleNo == vehicleNo,
       orElse: () => throw Exception('vehicle'),
@@ -914,7 +1017,13 @@ class DemoClient extends ErpNextClient {
 
   @override
   Future<Order> sendBack(String name, String reason) async =>
-      _change(name, (o) => _off(o, 'Sent Back', reason, 'warn'));
+      _change(name, (o) {
+        if (o.edit == null) return _off(o, 'Sent Back', reason, 'warn');
+        for (final t in _loading.where((t) => t.salesOrder == o.name)) {
+          _setTask(t.id, (t) => t.copyWith(changeRequested: false));
+        }
+        return _at(o.copyWith(clearEdit: true), 2);
+      });
 
   @override
   Future<void> setLanguage(String language) async {}

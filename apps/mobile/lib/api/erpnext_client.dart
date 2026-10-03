@@ -165,6 +165,31 @@ class ErpNextClient {
     return Order.fromJson(_message(res) as Map<String, dynamic>);
   }
 
+  /// One order in full, for the screen that edits it.
+  Future<Order> order(String name) async => Order.fromJson(
+    _message(await _post('astrasun.orders.get_order', {'name': name}))
+        as Map<String, dynamic>,
+  );
+
+  /// The rep or the warehouse changes an order; the owner has to approve it.
+  Future<Order> editOrder(
+    Order order,
+    List<OrderLine> lines,
+    String reason,
+  ) async => Order.fromJson(
+    _message(
+          await _post('astrasun.orders.edit_order', {
+            'name': order.name,
+            'items': [
+              for (final l in lines)
+                {'item_code': l.item.code, 'qty': l.qty, 'rate': l.rate},
+            ],
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
   Future<List<Order>> myOrders() async =>
       _orders(_message(await _post('astrasun.orders.my_orders', {})));
 
@@ -222,19 +247,38 @@ class ErpNextClient {
             as Map<String, dynamic>,
       );
 
-  /// [loaded] maps item code to the bags actually put on the truck.
+  /// The batches of a bag item that have bags in stock, oldest first (empty when the item has none).
+  Future<List<BatchStock>> batchesInStock(String itemCode) async => [
+    for (final b
+        in (_message(
+                  await _post('astrasun.loading.batches', {
+                    'item_code': itemCode,
+                  }),
+                )
+                as Map<String, dynamic>)['batches']
+            as List)
+      BatchStock.fromJson(b as Map<String, dynamic>),
+  ];
+
+  /// [loaded] maps item code to the bags actually put on the truck; [batches] maps item code to the
+  /// batch the warehouse chose for it.
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
-    Map<String, int> loaded,
-  ) async => LoadingTask.fromJson(
+    Map<String, int> loaded, {
+    Map<String, String> batches = const {},
+  }) async => LoadingTask.fromJson(
     _message(
           await _post('astrasun.loading.mark_loaded', {
             'name': task.id,
             'vehicle_no': vehicleNo,
             'items': [
               for (final e in loaded.entries)
-                {'item_code': e.key, 'qty': e.value},
+                {
+                  'item_code': e.key,
+                  'qty': e.value,
+                  if (batches[e.key] != null) 'batch_no': batches[e.key],
+                },
             ],
           }),
         )

@@ -1,0 +1,186 @@
+{%- set company = frappe.db.get_value("Company", doc.company, ["company_name", "phone_no", "email", "default_bank_account", "company_logo"], as_dict=1) or {} -%}
+{%- set logo = company.company_logo -%}
+{%- set bank = frappe.db.get_value("Bank Account", company.default_bank_account, ["account_name", "bank", "bank_account_no", "branch_code"], as_dict=1) if company.default_bank_account else None -%}
+{%- set received = (doc.grand_total or 0) - (doc.outstanding_amount or 0) -%}
+{%- set lines = doc.items -%}
+{%- macro money(v) -%}{{ "{:,.2f}".format(v or 0) }}{%- endmacro -%}
+<style>
+	.inv { font-family: Arial, Helvetica, 'Noto Sans', 'Noto Sans Devanagari', sans-serif; font-size: 11px; color: #222; width: 100%; }
+	.inv table { width: 100%; border-collapse: collapse; }
+	.inv td, .inv th { border: 1px solid #555; padding: 5px 7px; vertical-align: top; }
+	.inv th { background: #f2f2f2; text-align: left; font-weight: bold; }
+	.inv .r { text-align: right; }
+	.inv .c { text-align: center; }
+	.inv .head { font-size: 20px; font-weight: bold; text-align: center; border: 0; padding: 0 0 6px 0; }
+	.inv .head td { border: 0; }
+	.inv .co { font-size: 19px; font-weight: bold; letter-spacing: 0.5px; }
+	.inv .muted { color: #555; }
+	.inv .nb td { border: 0; padding: 1px 0; }
+	.inv .tot td { font-weight: bold; }
+	.inv .big td { font-size: 12px; font-weight: bold; }
+	.inv .gap { height: 6px; border: 0; }
+</style>
+<div class="inv">
+	<table class="head"><tr>
+		<td style="width:25%"></td>
+		<td style="font-size:20px;font-weight:bold;text-align:center">{{ _("Tax Invoice") }}</td>
+		<td style="width:25%;text-align:right" class="muted">{{ _("ORIGINAL FOR RECIPIENT") }}</td>
+	</tr></table>
+
+	<table>
+		<tr>
+			{% if logo %}<td style="width:90px;text-align:center"><img src="{{ logo }}" style="max-width:80px;max-height:80px"></td>{% endif %}
+			<td>
+				<div class="co">{{ (company.company_name or doc.company)|upper }}</div>
+				<div class="muted">{{ doc.company_address_display or "" }}</div>
+				<table class="nb"><tr>
+					<td>{% if company.phone_no %}{{ _("Phone") }}: <b>{{ company.phone_no }}</b>{% endif %}</td>
+					<td>{% if company.email %}{{ _("Email") }}: <b>{{ company.email }}</b>{% endif %}</td>
+				</tr><tr>
+					<td>{% if doc.company_gstin %}GSTIN: <b>{{ doc.company_gstin }}</b>{% endif %}</td>
+					<td>{% if doc.place_of_supply %}{{ _("State") }}: <b>{{ doc.place_of_supply }}</b>{% endif %}</td>
+				</tr></table>
+			</td>
+		</tr>
+	</table>
+
+	<table>
+		<tr><th style="width:50%">{{ _("Bill To") }}:</th><th>{{ _("Invoice Details") }}:</th></tr>
+		<tr>
+			<td>
+				<div><b>{{ doc.customer_name }}</b></div>
+				<div class="muted">{{ doc.address_display or "" }}</div>
+				{% if doc.contact_mobile %}<div>{{ _("Contact No") }}: <b>{{ doc.contact_mobile }}</b></div>{% endif %}
+				{% if doc.billing_address_gstin or doc.customer_gstin %}<div>GSTIN: <b>{{ doc.billing_address_gstin or doc.customer_gstin }}</b></div>{% endif %}
+			</td>
+			<td>
+				<div>{{ _("Invoice No.") }}: <b>{{ doc.name }}</b></div>
+				<div>{{ _("Date") }}: <b>{{ frappe.utils.formatdate(doc.posting_date, "dd/MM/yyyy") }}</b></div>
+				<div>{{ _("Place Of Supply") }}: <b>{{ doc.place_of_supply or "" }}</b></div>
+				{% if doc.po_no %}<div>{{ _("Order No.") }}: <b>{{ doc.po_no }}</b></div>{% endif %}
+			</td>
+		</tr>
+		<tr><th colspan="2">{{ _("Ship To") }}</th></tr>
+		<tr><td colspan="2" class="muted">{{ doc.shipping_address or doc.address_display or "" }}</td></tr>
+	</table>
+	<div class="gap"></div>
+
+	<table>
+		<tr>
+			<th class="c" style="width:4%">#</th>
+			<th>{{ _("Item name") }}</th>
+			<th>{{ _("HSN/ SAC") }}</th>
+			<th class="r">{{ _("Quantity") }}</th>
+			<th class="c">{{ _("Unit") }}</th>
+			<th class="r">{{ _("Price/ Unit (₹)") }}</th>
+			<th class="r">{{ _("GST (₹)") }}</th>
+			<th class="r">{{ _("Amount (₹)") }}</th>
+		</tr>
+		{%- set ns = namespace(qty=0, gst=0) -%}
+		{% for row in lines %}
+		{%- set gst = (row.cgst_amount or 0) + (row.sgst_amount or 0) + (row.igst_amount or 0) + (row.cess_amount or 0) -%}
+		{%- set rate = (row.cgst_rate or 0) + (row.sgst_rate or 0) + (row.igst_rate or 0) -%}
+		{%- set ns.qty = ns.qty + (row.qty or 0) -%}
+		{%- set ns.gst = ns.gst + gst -%}
+		<tr>
+			<td class="c">{{ loop.index }}</td>
+			<td>{{ row.item_name }}</td>
+			<td>{{ row.gst_hsn_code or "" }}</td>
+			<td class="r">{{ "%g"|format(row.qty or 0) }}</td>
+			<td class="c">{{ row.uom }}</td>
+			<td class="r">{{ money(row.rate) }}</td>
+			<td class="r">{{ money(gst) }} ({{ "%g"|format(rate) }}%)</td>
+			<td class="r">{{ money((row.net_amount or row.amount) + gst) }}</td>
+		</tr>
+		{% endfor %}
+		<tr class="tot">
+			<td></td><td>{{ _("Total") }}</td><td></td>
+			<td class="r">{{ "%g"|format(ns.qty) }}</td><td></td><td></td>
+			<td class="r">{{ money(ns.gst) }}</td>
+			<td class="r">{{ money(doc.grand_total - (doc.rounding_adjustment or 0)) }}</td>
+		</tr>
+	</table>
+
+	<table style="margin-top:0">
+		<tr>
+			<td style="width:62%;padding:0;border:0;vertical-align:top">
+				{%- set hsn = {} -%}
+				{%- for row in lines -%}
+					{%- set key = row.gst_hsn_code or "-" -%}
+					{%- if key not in hsn -%}{%- set _x = hsn.update({key: {"taxable": 0, "cgst": 0, "sgst": 0, "igst": 0, "cr": row.cgst_rate or 0, "sr": row.sgst_rate or 0, "ir": row.igst_rate or 0}}) -%}{%- endif -%}
+					{%- set _y = hsn[key].update({"taxable": hsn[key].taxable + (row.net_amount or row.amount or 0), "cgst": hsn[key].cgst + (row.cgst_amount or 0), "sgst": hsn[key].sgst + (row.sgst_amount or 0), "igst": hsn[key].igst + (row.igst_amount or 0)}) -%}
+				{%- endfor -%}
+				{%- set inter = (doc.total_taxes_and_charges or 0) > 0 and ((lines|sum(attribute="igst_amount")) or 0) > 0 -%}
+				<table>
+					<tr><th colspan="{{ 6 if inter else 7 }}">{{ _("Tax Summary") }}:</th></tr>
+					<tr>
+						<th rowspan="2">{{ _("HSN/ SAC") }}</th>
+						<th rowspan="2" class="r">{{ _("Taxable amount (₹)") }}</th>
+						{% if inter %}<th colspan="2" class="c">IGST</th>{% else %}<th colspan="2" class="c">CGST</th><th colspan="2" class="c">SGST</th>{% endif %}
+						<th rowspan="2" class="r">{{ _("Total Tax (₹)") }}</th>
+					</tr>
+					<tr>
+						{% if inter %}<th class="r">{{ _("Rate (%)") }}</th><th class="r">{{ _("Amt (₹)") }}</th>
+						{% else %}<th class="r">{{ _("Rate (%)") }}</th><th class="r">{{ _("Amt (₹)") }}</th><th class="r">{{ _("Rate (%)") }}</th><th class="r">{{ _("Amt (₹)") }}</th>{% endif %}
+					</tr>
+					{%- set tt = namespace(taxable=0, tax=0) -%}
+					{% for key, h in hsn.items() %}
+					{%- set tt.taxable = tt.taxable + h.taxable -%}
+					{%- set tt.tax = tt.tax + h.cgst + h.sgst + h.igst -%}
+					<tr>
+						<td>{{ key }}</td><td class="r">{{ money(h.taxable) }}</td>
+						{% if inter %}<td class="r">{{ "%g"|format(h.ir) }}</td><td class="r">{{ money(h.igst) }}</td>
+						{% else %}<td class="r">{{ "%g"|format(h.cr) }}</td><td class="r">{{ money(h.cgst) }}</td><td class="r">{{ "%g"|format(h.sr) }}</td><td class="r">{{ money(h.sgst) }}</td>{% endif %}
+						<td class="r">{{ money(h.cgst + h.sgst + h.igst) }}</td>
+					</tr>
+					{% endfor %}
+					<tr class="tot"><td class="r">{{ _("TOTAL") }}</td><td class="r">{{ money(tt.taxable) }}</td>
+						{% if inter %}<td></td><td></td>{% else %}<td></td><td></td><td></td><td></td>{% endif %}
+						<td class="r">{{ money(tt.tax) }}</td></tr>
+				</table>
+			</td>
+			<td style="padding:0;border:0;vertical-align:top">
+				<table>
+					<tr><td>{{ _("Sub Total") }}</td><td class="r">₹ {{ money(doc.net_total + (doc.total_taxes_and_charges or 0)) }}</td></tr>
+					{% if doc.discount_amount %}<tr><td>{{ _("Discount") }}</td><td class="r">- ₹ {{ money(doc.discount_amount) }}</td></tr>{% endif %}
+					{% if doc.rounding_adjustment %}<tr><td>{{ _("Round off") }}</td><td class="r">₹ {{ money(doc.rounding_adjustment) }}</td></tr>{% endif %}
+					<tr class="big"><td>{{ _("Total") }}</td><td class="r">₹ {{ money(doc.grand_total) }}</td></tr>
+					<tr><td colspan="2"><b>{{ _("Invoice Amount in Words") }}:</b><br>{{ doc.in_words or "" }}</td></tr>
+					<tr><td>{{ _("Received") }}</td><td class="r">₹ {{ money(received) }}</td></tr>
+					<tr class="tot"><td>{{ _("Balance") }}</td><td class="r">₹ {{ money(doc.outstanding_amount) }}</td></tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+	<table>
+		<tr><th>{{ _("Payment Mode") }}:</th></tr>
+		<tr><td>{{ _("Credit") if (doc.outstanding_amount or 0) > 0 else _("Paid") }}</td></tr>
+	</table>
+	<div class="gap"></div>
+
+	{% if doc.terms %}
+	<table>
+		<tr><th>{{ _("Terms & Conditions") }}:</th></tr>
+		<tr><td>{{ doc.terms }}</td></tr>
+	</table>
+	{% endif %}
+
+	<table>
+		<tr>
+			<th style="width:60%">{{ _("Bank Details") }}:</th>
+			<th>{{ _("For") }} {{ (company.company_name or doc.company)|upper }}:</th>
+		</tr>
+		<tr>
+			<td style="height:70px">
+				{% if bank %}
+				<div>{{ _("Name") }}: <b>{{ bank.bank or "" }}</b></div>
+				<div>{{ _("Account No.") }}: <b>{{ bank.bank_account_no or "" }}</b></div>
+				<div>{{ _("IFSC code") }}: <b>{{ bank.branch_code or "" }}</b></div>
+				<div>{{ _("Account holder's name") }}: <b>{{ (bank.account_name or company.company_name or "")|upper }}</b></div>
+				{% endif %}
+			</td>
+			<td class="c" style="vertical-align:bottom">{{ _("Authorized Signatory") }}</td>
+		</tr>
+	</table>
+</div>
