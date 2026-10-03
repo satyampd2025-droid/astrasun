@@ -66,3 +66,22 @@ class TestInvoicing(MillFixture):
 		frappe.set_user(self.accounts)
 		with self.assertRaises(frappe.PermissionError):
 			invoicing.dispatch(dn)  # accounts bill, they do not send trucks
+
+	def test_the_truck_leaves_without_anyone_typing_a_batch(self):
+		# ERPNext skips its batch check while testing, so switch the test mode off to see what a real server does
+		from astrasun.setup.install import setup_stock_settings
+
+		setup_stock_settings()
+		self.assertEqual(
+			frappe.db.get_single_value("Stock Settings", "auto_create_serial_and_batch_bundle_for_outward"), 1
+		)
+		so, dn = self._loaded(qty=4)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		in_test, frappe.flags.in_test = frappe.flags.in_test, False
+		try:
+			out = invoicing.dispatch(dn)
+		finally:
+			frappe.flags.in_test = in_test
+		self.assertEqual(out["status"], "Dispatched")
