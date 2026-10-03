@@ -128,3 +128,9 @@ class TestLoadChanges(MillFixture):
 		invoicing.dispatch(dn)
 		with self.assertRaises(loading.LoadingError):
 			self._ask(dn, 8)
+
+	def test_the_server_has_a_hindi_font_for_the_bill(self):
+		import subprocess
+
+		listed = subprocess.run(["fc-list", ":lang=hi"], capture_output=True, text=True).stdout
+		self.assertIn("Devanagari", listed)
