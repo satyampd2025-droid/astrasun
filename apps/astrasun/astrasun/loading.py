@@ -74,7 +74,9 @@ def _task(dn):
 		"customer": dn.customer,
 		"customer_name": dn.customer_name,
 		"status": dn.astrasun_loading_status,
-		"stage": stages.truck_stage(dn.astrasun_loading_status),
+		"stage": stages.WAITING
+		if dn.astrasun_change_status == CHANGE_REQUESTED
+		else stages.truck_stage(dn.astrasun_loading_status),
 		"vehicle_no": dn.astrasun_vehicle_no,
 		"driver_name": dn.astrasun_driver_name,
 		"driver_phone": dn.astrasun_driver_phone,
@@ -169,6 +171,8 @@ def mark_loaded(name, vehicle_no, items=None):
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADING:
 		frappe.throw(_("This loading task is not open"), LoadingError)
+	if dn.astrasun_change_status == CHANGE_REQUESTED:
+		frappe.throw(_("A change is waiting for the owner"), LoadingError)
 	if items:
 		items = json.loads(items) if isinstance(items, str) else items
 		loaded = {row["item_code"]: flt(row["qty"]) for row in items}
@@ -203,7 +207,7 @@ def _ordered(dn):
 
 @frappe.whitelist()
 def request_change(name, items, reason):
-	"""After the bill is printed the load changed: the warehouse asks the owner to approve new bags.
+	"""The load changed: the warehouse asks the owner to approve new bags, before the truck leaves.
 
 	`items` is [{item_code, qty}] with the new bags for each item (0 takes an item off).
 	Nothing changes until the owner approves; the truck cannot leave meanwhile.
@@ -213,8 +217,8 @@ def request_change(name, items, reason):
 	if not reason:
 		frappe.throw(_("Give a reason for the change"), LoadingError)
 	dn = frappe.get_doc("Delivery Note", name)
-	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADED:
-		frappe.throw(_("Only a loaded truck that has not left can be changed"), LoadingError)
+	if dn.docstatus != 0 or dn.astrasun_loading_status not in (LOADING, LOADED):
+		frappe.throw(_("Only a truck that has not left can be changed"), LoadingError)
 	if dn.astrasun_change_status == CHANGE_REQUESTED:
 		frappe.throw(_("A change is already waiting for the owner"), LoadingError)
 	items = json.loads(items) if isinstance(items, str) else items
