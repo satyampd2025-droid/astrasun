@@ -68,6 +68,13 @@ def to_dispatch():
 	return [_view(frappe.get_doc("Delivery Note", n)) for n in names]
 
 
+def _edit_waiting(dn):
+	return bool(
+		dn.items
+		and frappe.db.get_value("Sales Order", dn.items[0].against_sales_order, "astrasun_edit_json")
+	)
+
+
 @frappe.whitelist()
 def invoice(name):
 	"""Print bill: bill a loaded truck from the bags actually loaded."""
@@ -79,7 +86,7 @@ def invoice(name):
 		frappe.throw(_("Only a loaded truck can be invoiced"), InvoicingError)
 	if dn.astrasun_invoice:
 		frappe.throw(_("This truck is already invoiced"), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 
 	loaded = {r.so_detail: flt(r.qty) for r in dn.items}
@@ -123,7 +130,7 @@ def dispatch(name):
 		frappe.throw(_("This truck is not ready to leave"), InvoicingError)
 	if not dn.astrasun_invoice:
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 	with _as_system():
 		dn.astrasun_loading_status = DISPATCHED
