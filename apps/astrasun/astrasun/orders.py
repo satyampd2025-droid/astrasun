@@ -279,6 +279,7 @@ def _approve_edit(doc, note):
 		doc.cancel()
 		date = payload.get("delivery_date") or str(doc.delivery_date)
 		new = frappe.copy_doc(doc)
+		new.docstatus = 0
 		new.amended_from = old_name
 		new.items = []
 		for row in payload["items"]:
