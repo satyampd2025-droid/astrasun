@@ -27,6 +27,7 @@ void main() {
     await tester.tap(find.text('Bills and payments'));
     await tester.pumpAndSettle();
     expect(find.text('Sharma Kirana Store'), findsOneWidget);
+    expect(find.text('Loaded'), findsOneWidget);
 
     // 40 x 2150 + 20 x 440 = 94,800: over 50,000, so the e-way bill is needed
     await tester.tap(find.byKey(const Key('invoice-SAL-ORD-0000')));
@@ -73,6 +74,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send trucks'));
     await tester.pumpAndSettle();
+    expect(find.text('Loaded'), findsOneWidget);
     await tester.tap(find.byKey(const Key('dispatch-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('no-trucks')), findsOneWidget);

@@ -18,7 +18,7 @@ void main() {
     await tester.tap(find.text('Loading queue'));
     await tester.pumpAndSettle();
     expect(find.text('Sharma Kirana Store'), findsOneWidget);
-    expect(find.text('Waiting'), findsOneWidget);
+    expect(find.text('Approved'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('start-SAL-ORD-0000')));
     await tester.pumpAndSettle();
@@ -70,7 +70,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('लोडिंग सूची'));
     await tester.pumpAndSettle();
-    expect(find.text('इंतज़ार में'), findsOneWidget);
+    expect(find.text('मंज़ूर'), findsOneWidget);
     expect(find.text('लोडिंग शुरू करें'), findsOneWidget);
   });
 }

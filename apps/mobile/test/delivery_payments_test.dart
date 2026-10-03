@@ -23,6 +23,7 @@ void main() {
 
     await tester.tap(find.text('My deliveries'));
     await tester.pumpAndSettle();
+    expect(find.text('On the way'), findsOneWidget);
     await tester.tap(find.byKey(const Key('deliver-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     // A name is required

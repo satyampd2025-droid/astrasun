@@ -31,6 +31,21 @@ void main() {
     expect(labels.where((l) => l == 'Customer dues').length, 1);
   });
 
+  test('the owner and the manager approve orders and see all of them', () {
+    for (final role in ['Mill Owner', 'Mill Manager']) {
+      final labels = tasksFor([role]).map((t) => t.label);
+      expect(
+        labels,
+        containsAll(['Approve orders', 'All orders']),
+        reason: role,
+      );
+    }
+    expect(
+      tasksFor(['Mill Sales']).map((t) => t.label),
+      isNot(contains('All orders')),
+    );
+  });
+
   test('unknown roles give no tasks', () {
     expect(tasksFor(['Something Else']), isEmpty);
   });

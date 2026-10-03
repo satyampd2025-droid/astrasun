@@ -20,13 +20,29 @@ class OrderItem {
   final double rate;
 }
 
+/// One row of an order's timeline. [state] is done, current or todo.
+class TimelineRow {
+  const TimelineRow(this.label, this.state);
+
+  factory TimelineRow.fromJson(Map<String, dynamic> j) =>
+      TimelineRow(j['label'] as String, j['state'] as String);
+
+  final String label;
+  final String state;
+}
+
 class Order {
+  /// [stage], [tone] and [timeline] come from the server. A server that sends
+  /// none still gets a sensible stage and colour from the approval [status].
   Order({
     required this.name,
     required this.customerName,
     required this.status,
     required this.total,
     required this.items,
+    String? stage,
+    String? tone,
+    this.timeline = const [],
     this.note,
     this.creditOutstanding = 0,
     this.creditLimit = 0,
@@ -34,12 +50,21 @@ class Order {
     this.creditBreach = false,
     this.stockShort = false,
     this.belowPrice = false,
-  });
+  }) : stage =
+           stage ??
+           (status == 'Pending Approval' ? 'Waiting for approval' : status),
+       tone = tone ?? _toneOf(status);
 
   factory Order.fromJson(Map<String, dynamic> j) => Order(
     name: j['name'] as String,
     customerName: (j['customer_name'] as String?) ?? j['customer'] as String,
     status: j['status'] as String,
+    stage: j['stage'] as String?,
+    tone: j['tone'] as String?,
+    timeline: [
+      for (final r in (j['timeline'] as List?) ?? const [])
+        TimelineRow.fromJson(r as Map<String, dynamic>),
+    ],
     total: (j['total'] as num).toDouble(),
     note: j['note'] as String?,
     creditOutstanding: (j['credit_outstanding'] as num? ?? 0).toDouble(),
@@ -54,9 +79,28 @@ class Order {
     ],
   );
 
+  static String _toneOf(String status) => switch (status) {
+    'Approved' => 'go',
+    'Rejected' => 'stop',
+    'Sent Back' => 'warn',
+    _ => 'wait',
+  };
+
   final String name;
   final String customerName;
+
+  /// The approval status: Draft, Pending Approval, Approved, Rejected or Sent Back.
   final String status;
+
+  /// Where the order stands, in the words every screen uses (Waiting for
+  /// approval, Loading, On the way, Part paid, Paid ...).
+  final String stage;
+
+  /// How to colour the stage: wait, go, warn, done or stop.
+  final String tone;
+
+  /// The steps of the order's ladder; empty for an order that is not on it.
+  final List<TimelineRow> timeline;
   final double total;
   final String? note;
   final double creditOutstanding;
@@ -67,10 +111,19 @@ class Order {
   final bool belowPrice;
   final List<OrderItem> items;
 
-  Order copyWith({String? status, String? note}) => Order(
+  Order copyWith({
+    String? status,
+    String? note,
+    String? stage,
+    String? tone,
+    List<TimelineRow>? timeline,
+  }) => Order(
     name: name,
     customerName: customerName,
     status: status ?? this.status,
+    stage: stage ?? this.stage,
+    tone: tone ?? this.tone,
+    timeline: timeline ?? this.timeline,
     total: total,
     items: items,
     note: note ?? this.note,
@@ -124,13 +177,15 @@ class LoadingTask {
     this.total = 0,
     this.ewayNeeded = false,
     this.ewayBillNo,
-  });
+    String? stage,
+  }) : _stage = stage;
 
   factory LoadingTask.fromJson(Map<String, dynamic> json) => LoadingTask(
     id: (json['name'] ?? json['sales_order']) as String,
     salesOrder: json['sales_order'] as String,
     customerName: (json['customer_name'] ?? json['customer']) as String,
     status: json['status'] as String,
+    stage: json['stage'] as String?,
     vehicleNo: json['vehicle_no'] as String?,
     invoice: json['invoice'] as String?,
     total: ((json['total'] as num?) ?? 0).toDouble(),
@@ -152,8 +207,19 @@ class LoadingTask {
   final String salesOrder;
   final String customerName;
 
-  /// Waiting, Loading or Loaded.
+  /// Waiting, Loading, Loaded or Dispatched.
   final String status;
+  final String? _stage;
+
+  /// The word for this truck on the order's ladder (the server sends it; an
+  /// older server's status is turned into the same words here).
+  String get stage =>
+      _stage ??
+      switch (status) {
+        'Waiting' => 'Approved',
+        'Dispatched' => 'On the way',
+        _ => status,
+      };
   final String? vehicleNo;
   final List<OrderItem> items;
 
@@ -179,6 +245,7 @@ class LoadingTask {
     salesOrder: salesOrder,
     customerName: customerName,
     status: status ?? this.status,
+    stage: status == null ? _stage : null,
     vehicleNo: vehicleNo ?? this.vehicleNo,
     items: items ?? this.items,
     invoice: invoice ?? this.invoice,

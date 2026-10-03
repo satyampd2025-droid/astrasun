@@ -170,6 +170,10 @@ class ErpNextClient {
   Future<List<Order>> pendingApprovals() async =>
       _orders(_message(await _post('astrasun.orders.pending_approvals', {})));
 
+  /// Every order that was sent in, with where it stands (owner and manager).
+  Future<List<Order>> allOrders() async =>
+      _orders(_message(await _post('astrasun.orders.all_orders', {})));
+
   List<Order> _orders(dynamic list) => [
     for (final o in list as List) Order.fromJson(o as Map<String, dynamic>),
   ];

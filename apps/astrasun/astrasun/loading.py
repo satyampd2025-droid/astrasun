@@ -13,6 +13,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from astrasun import stages
+
 LOADER_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 LOADING, LOADED = "Loading", "Loaded"
 
@@ -43,6 +45,7 @@ def _task(dn):
 		"customer": dn.customer,
 		"customer_name": dn.customer_name,
 		"status": dn.astrasun_loading_status,
+		"stage": stages.truck_stage(dn.astrasun_loading_status),
 		"vehicle_no": dn.astrasun_vehicle_no,
 		"loaded_by": dn.astrasun_loaded_by,
 		"items": [
@@ -58,6 +61,7 @@ def _waiting(so):
 		"customer_name": so.customer_name,
 		"delivery_date": str(so.delivery_date),
 		"status": "Waiting",
+		"stage": stages.truck_stage("Waiting"),
 		"items": [
 			{"item_code": r.item_code, "item_name": r.item_name, "qty": flt(r.qty - r.delivered_qty)}
 			for r in so.items

@@ -6,6 +6,12 @@ from astrasun import orders
 ITEM = "ATTA-50KG"
 
 
+def mill_company():
+	"""The company the mill's items are set up for. Tests start from this and not from the site's default
+	company: the test runner makes one of its own test companies the default."""
+	return frappe.db.get_value("Item Default", {"parent": ITEM}, "company")
+
+
 def _user(email, profile):
 	if not frappe.db.exists("User", email):
 		frappe.get_doc(
@@ -23,7 +29,7 @@ def _user(email, profile):
 class MillFixture(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.company = frappe.db.get_value("Item Default", {"parent": ITEM}, "company")
+		self.company = mill_company()
 		self.abbr = frappe.get_cached_value("Company", self.company, "abbr")
 		self._open_fiscal_year()
 		self.rep = _user("rep@example.com", "Mill Sales")

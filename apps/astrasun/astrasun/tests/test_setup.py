@@ -3,13 +3,12 @@ from frappe.tests.utils import FrappeTestCase
 
 from astrasun.setup.masters import PACK_SIZES, WAREHOUSES, bag_code, setup_mill, sku_code
 from astrasun.setup.roles import ROLE_PROFILES, sync_users
+from astrasun.tests.helpers import mill_company
 
 
 class TestSetup(FrappeTestCase):
 	def setUp(self):
-		self.company = (
-			frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name")[0]
-		)
+		self.company = mill_company()
 		self.abbr = frappe.get_cached_value("Company", self.company, "abbr")
 
 	def _account(self, email, *roles):

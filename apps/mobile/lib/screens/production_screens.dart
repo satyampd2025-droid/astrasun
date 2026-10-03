@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
-import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
+import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
 
 void _snack(BuildContext context, String text, {Key? key}) =>
@@ -265,29 +265,34 @@ class _PackScreenState extends State<PackScreen> {
         );
       }
     }
+    _reload();
+  }
+
+  void _reload() {
     setState(() {
       _skus = widget.client.packSkus();
     });
+  }
+
+  Future<void> _refresh() {
+    _reload();
+    return settled(_skus);
   }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('Pack bags'))),
-      body: FutureBuilder<List<PackSku>>(
+      appBar: AppBar(
+        title: Text(s.t('Pack bags')),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload.list<PackSku>(
         future: _skus,
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final k in snap.data!) _PackCard(sku: k, onPack: _pack),
-            ],
-          );
-        },
+        onRefresh: _refresh,
+        cards: (context, skus) => [
+          for (final k in skus) _PackCard(sku: k, onPack: _pack),
+        ],
       ),
     );
   }
@@ -342,53 +347,61 @@ class _PackCard extends StatelessWidget {
 }
 
 /// Everyone: wheat, bulk flour and packed bags on hand.
-class StockScreen extends StatelessWidget {
+class StockScreen extends StatefulWidget {
   const StockScreen({super.key, required this.client});
   final ErpNextClient client;
+
+  @override
+  State<StockScreen> createState() => _StockScreenState();
+}
+
+class _StockScreenState extends State<StockScreen> {
+  late Future<List<StockRow>> _rows = widget.client.stock();
+
+  Future<void> _refresh() {
+    setState(() {
+      _rows = widget.client.stock();
+    });
+    return settled(_rows);
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s.t('Stock'))),
-      body: FutureBuilder<List<StockRow>>(
-        future: client.stock(),
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) return LoadError(snap.error);
-          final rows = snap.data!;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              for (final kind in const ['Raw', 'Bulk', 'Packed']) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 4),
-                  child: Text(
-                    s.t(kind),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                for (final r in rows.where((r) => r.kind == kind))
-                  Card(
-                    color: Colors.white,
-                    child: ListTile(
-                      key: Key('stock-${r.code}'),
-                      title: Text(r.name, style: const TextStyle(fontSize: 18)),
-                      trailing: Text(
-                        '${_group(r.qty)} ${s.t(r.unit)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+      appBar: AppBar(
+        title: Text(s.t('Stock')),
+        actions: [RefreshButton(onPressed: _refresh)],
+      ),
+      body: PullToReload.list<StockRow>(
+        future: _rows,
+        onRefresh: _refresh,
+        cards: (context, rows) => [
+          for (final kind in const ['Raw', 'Bulk', 'Packed']) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Text(
+                s.t(kind),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final r in rows.where((r) => r.kind == kind))
+              Card(
+                color: Colors.white,
+                child: ListTile(
+                  key: Key('stock-${r.code}'),
+                  title: Text(r.name, style: const TextStyle(fontSize: 18)),
+                  trailing: Text(
+                    '${_group(r.qty)} ${s.t(r.unit)}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-              ],
-            ],
-          );
-        },
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

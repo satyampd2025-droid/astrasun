@@ -22,11 +22,62 @@ class DemoClient extends ErpNextClient {
     CatalogItem('MAIDA-50KG', 'Maida 50 kg', 2300),
   ];
 
+  static const _ladder = [
+    'Waiting for approval',
+    'Approved',
+    'Loading',
+    'Loaded',
+    'On the way',
+    'Delivered',
+    'Paid',
+  ];
+
+  /// The rows the server sends for an order standing at [step] (1 to 7).
+  static List<TimelineRow> _rows(int step, String label) => [
+    for (var i = 0; i < _ladder.length; i++)
+      TimelineRow(
+        i + 1 == step ? label : _ladder[i],
+        i + 1 < step
+            ? 'done'
+            : i + 1 == step
+            ? 'current'
+            : 'todo',
+      ),
+  ];
+
+  /// [order] moved to [step] of the ladder, in the words the server would use.
+  static Order _at(
+    Order order,
+    int step, {
+    String? label,
+    String tone = 'go',
+    String? status,
+  }) {
+    final word = label ?? _ladder[step - 1];
+    return order.copyWith(
+      status: status,
+      stage: word,
+      tone: tone,
+      timeline: _rows(step, word),
+    );
+  }
+
+  /// [order] taken off the ladder: rejected or sent back.
+  static Order _off(Order order, String status, String reason, String tone) =>
+      order.copyWith(
+        status: status,
+        note: reason,
+        stage: status,
+        tone: tone,
+        timeline: const [],
+      );
+
   late final List<Order> _orders = [
     Order(
       name: 'SAL-ORD-0001',
       customerName: 'Sharma Kirana Store',
       status: 'Pending Approval',
+      timeline: _rows(1, _ladder[0]),
       total: 21500,
       creditOutstanding: 12000,
       creditLimit: 50000,
@@ -44,6 +95,7 @@ class DemoClient extends ErpNextClient {
       name: 'SAL-ORD-0002',
       customerName: 'Verma Distributors',
       status: 'Pending Approval',
+      timeline: _rows(1, _ladder[0]),
       total: 112000,
       creditOutstanding: 60000,
       creditLimit: 100000,
@@ -62,6 +114,7 @@ class DemoClient extends ErpNextClient {
       name: 'SAL-ORD-0003',
       customerName: 'Gupta Traders',
       status: 'Pending Approval',
+      timeline: _rows(1, _ladder[0]),
       total: 46000,
       creditLimit: 80000,
       creditExposure: 46000,
@@ -100,6 +153,7 @@ class DemoClient extends ErpNextClient {
       name: 'SAL-ORD-${(_next++).toString().padLeft(4, '0')}',
       customerName: customer.displayName,
       status: 'Pending Approval',
+      timeline: _rows(1, _ladder[0]),
       total: total,
       creditLimit: 50000,
       creditExposure: total,
@@ -121,19 +175,38 @@ class DemoClient extends ErpNextClient {
   Future<List<Order>> myOrders() async => List.of(_orders);
 
   @override
+  Future<List<Order>> allOrders() async => [
+    for (final o in _orders)
+      if (o.status != 'Draft') o,
+  ];
+
+  @override
   Future<List<Order>> pendingApprovals() async => [
     for (final o in _orders)
       if (o.status == 'Pending Approval') o,
   ];
 
-  Order _set(String name, String status, [String? note]) {
+  Order _change(String name, Order Function(Order) change) {
     final i = _orders.indexWhere((o) => o.name == name);
-    return _orders[i] = _orders[i].copyWith(status: status, note: note);
+    return _orders[i] = change(_orders[i]);
+  }
+
+  /// A truck of [salesOrder] moved on; the order follows it up the ladder.
+  /// The demo's own first job has no order behind it, so it is left alone.
+  void _follow(
+    String salesOrder,
+    int step, {
+    String? label,
+    String tone = 'go',
+  }) {
+    if (_orders.any((o) => o.name == salesOrder)) {
+      _change(salesOrder, (o) => _at(o, step, label: label, tone: tone));
+    }
   }
 
   @override
   Future<Order> approve(String name) async {
-    final done = _set(name, 'Approved');
+    final done = _change(name, (o) => _at(o, 2, status: 'Approved'));
     _loading.add(
       LoadingTask(
         id: done.name,
@@ -181,35 +254,40 @@ class DemoClient extends ErpNextClient {
   ];
 
   @override
-  Future<LoadingTask> startLoading(LoadingTask task) async =>
-      _setTask(task.id, (t) => t.copyWith(status: 'Loading'));
+  Future<LoadingTask> startLoading(LoadingTask task) async {
+    _follow(task.salesOrder, 3);
+    return _setTask(task.id, (t) => t.copyWith(status: 'Loading'));
+  }
 
   @override
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
     Map<String, int> loaded,
-  ) async => _setTask(
-    task.id,
-    (t) => t.copyWith(
-      status: 'Loaded',
-      vehicleNo: vehicleNo,
-      items: [
-        for (final i in t.items)
-          if ((loaded[i.itemCode] ?? 0) > 0)
-            OrderItem(
-              itemCode: i.itemCode,
-              itemName: i.itemName,
-              qty: loaded[i.itemCode]!.toDouble(),
-              rate: 0,
-            ),
-      ],
-    ),
-  );
+  ) async {
+    _follow(task.salesOrder, 4);
+    return _setTask(
+      task.id,
+      (t) => t.copyWith(
+        status: 'Loaded',
+        vehicleNo: vehicleNo,
+        items: [
+          for (final i in t.items)
+            if ((loaded[i.itemCode] ?? 0) > 0)
+              OrderItem(
+                itemCode: i.itemCode,
+                itemName: i.itemName,
+                qty: loaded[i.itemCode]!.toDouble(),
+                rate: 0,
+              ),
+        ],
+      ),
+    );
+  }
 
   @override
   Future<Order> reject(String name, String reason) async =>
-      _set(name, 'Rejected', reason);
+      _change(name, (o) => _off(o, 'Rejected', reason, 'stop'));
 
   double _worth(List<OrderItem> items) => items.fold(0, (sum, i) {
     final rate = _items.firstWhere((c) => c.code == i.itemCode).rate;
@@ -244,8 +322,10 @@ class DemoClient extends ErpNextClient {
   }
 
   @override
-  Future<LoadingTask> dispatchTruck(LoadingTask task) async =>
-      _setTask(task.id, (t) => t.copyWith(status: 'Dispatched'));
+  Future<LoadingTask> dispatchTruck(LoadingTask task) async {
+    _follow(task.salesOrder, 5);
+    return _setTask(task.id, (t) => t.copyWith(status: 'Dispatched'));
+  }
 
   @override
   Future<List<LoadingTask>> myDeliveries() async => [
@@ -260,6 +340,12 @@ class DemoClient extends ErpNextClient {
     String remarks,
   ) async {
     if (receivedBy.trim().isEmpty) throw Exception('receiver');
+    _follow(
+      task.salesOrder,
+      6,
+      label: 'Delivered, payment pending',
+      tone: 'warn',
+    );
     return _setTask(task.id, (t) => t.copyWith(status: 'Delivered'));
   }
 
@@ -581,7 +667,7 @@ class DemoClient extends ErpNextClient {
 
   @override
   Future<Order> sendBack(String name, String reason) async =>
-      _set(name, 'Sent Back', reason);
+      _change(name, (o) => _off(o, 'Sent Back', reason, 'warn'));
 
   @override
   Future<void> setLanguage(String language) async {}

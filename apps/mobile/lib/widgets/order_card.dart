@@ -16,99 +16,121 @@ String rupees(double v) {
   return '₹$grouped,$tail';
 }
 
-Color statusColor(String status) => switch (status) {
-  'Approved' => const Color(0xFF1E5B45),
-  'Rejected' => const Color(0xFFB23A30),
-  'Sent Back' => const Color(0xFF9A6A00),
+/// The colour of a stage, from the tone the server sends: done (green), stop
+/// (red), warn (amber), go (blue), else wait (grey).
+Color toneColor(String tone) => switch (tone) {
+  'done' => const Color(0xFF1E5B45),
+  'stop' => const Color(0xFFB23A30),
+  'warn' => const Color(0xFF9A6A00),
+  'go' => const Color(0xFF2557A7),
   _ => const Color(0xFF5C655E),
 };
 
-/// One order: customer, items, total and the facts an approver needs.
+/// Where something stands, as a coloured chip: the order's stage, or a truck's.
+class StageChip extends StatelessWidget {
+  const StageChip(this.stage, {super.key, this.tone = 'go'});
+  final String stage;
+  final String tone;
+
+  @override
+  Widget build(BuildContext context) =>
+      _Chip(S.of(context).t(stage), toneColor(tone));
+}
+
+/// One order: customer, items, total, where it stands and the facts an
+/// approver needs. With [onTap] the card opens the order in full.
 class OrderCard extends StatelessWidget {
-  const OrderCard({super.key, required this.order, this.actions});
+  const OrderCard({super.key, required this.order, this.actions, this.onTap});
   final Order order;
   final Widget? actions;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final theme = Theme.of(context);
     return Card(
+      key: Key('order-${order.name}'),
       margin: const EdgeInsets.only(bottom: 12),
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    order.customerName,
-                    style: theme.textTheme.titleLarge,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.customerName,
+                      style: theme.textTheme.titleLarge,
+                    ),
                   ),
-                ),
+                  Text(
+                    rupees(order.total),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (onTap != null) const Icon(Icons.chevron_right),
+                ],
+              ),
+              const SizedBox(height: 4),
+              for (final i in order.items)
                 Text(
-                  rupees(order.total),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  '${i.itemName} × ${i.qty.round()}  @ ${rupees(i.rate)}',
+                  style: theme.textTheme.bodyLarge,
+                ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _Chip(
+                    s.t(order.stage),
+                    toneColor(order.tone),
+                    key: const Key('status-chip'),
                   ),
+                  if (order.creditBreach)
+                    _Chip(
+                      s.t('Over credit limit'),
+                      const Color(0xFFB23A30),
+                      key: const Key('credit-chip'),
+                    ),
+                  if (order.belowPrice)
+                    _Chip(
+                      s.t('Below list price'),
+                      const Color(0xFF9A6A00),
+                      key: const Key('price-chip'),
+                    ),
+                  if (order.stockShort)
+                    _Chip(
+                      s.t('Stock is short'),
+                      const Color(0xFF9A6A00),
+                      key: const Key('stock-chip'),
+                    ),
+                ],
+              ),
+              if (order.creditLimit > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  s.t('Dues {0} + this order = {1} of limit {2}', [
+                    rupees(order.creditOutstanding),
+                    rupees(order.creditExposure),
+                    rupees(order.creditLimit),
+                  ]),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            for (final i in order.items)
-              Text(
-                '${i.itemName} × ${i.qty.round()}  @ ${rupees(i.rate)}',
-                style: theme.textTheme.bodyLarge,
-              ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                _Chip(
-                  s.t(order.status),
-                  statusColor(order.status),
-                  key: const Key('status-chip'),
-                ),
-                if (order.creditBreach)
-                  _Chip(
-                    s.t('Over credit limit'),
-                    const Color(0xFFB23A30),
-                    key: const Key('credit-chip'),
-                  ),
-                if (order.belowPrice)
-                  _Chip(
-                    s.t('Below list price'),
-                    const Color(0xFF9A6A00),
-                    key: const Key('price-chip'),
-                  ),
-                if (order.stockShort)
-                  _Chip(
-                    s.t('Stock is short'),
-                    const Color(0xFF9A6A00),
-                    key: const Key('stock-chip'),
-                  ),
+              if ((order.note ?? '').isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('“${order.note}”'),
               ],
-            ),
-            if (order.creditLimit > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                s.t('Dues {0} + this order = {1} of limit {2}', [
-                  rupees(order.creditOutstanding),
-                  rupees(order.creditExposure),
-                  rupees(order.creditLimit),
-                ]),
-              ),
+              if (actions != null) ...[const SizedBox(height: 12), actions!],
             ],
-            if ((order.note ?? '').isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('“${order.note}”'),
-            ],
-            if (actions != null) ...[const SizedBox(height: 12), actions!],
-          ],
+          ),
         ),
       ),
     );
