@@ -15,6 +15,7 @@ const Map<String, List<Task>> roleTasks = {
     Task('Approve orders', Icons.verified_outlined, 2),
     Task('All orders', Icons.list_alt_outlined, 2),
     Task('Today at the mill', Icons.dashboard_outlined, 5),
+    Task('Settle cash', Icons.savings_outlined, 2),
     Task('Load changes', Icons.edit_note_outlined, 2),
     Task('Bills and payments', Icons.request_quote_outlined, 2),
     Task('Customer dues', Icons.account_balance_wallet_outlined, 2),
@@ -34,7 +35,7 @@ const Map<String, List<Task>> roleTasks = {
   'Mill Sales': [
     Task('New order', Icons.add_shopping_cart, 2),
     Task('My orders', Icons.receipt_long_outlined, 2),
-    Task('Customer dues', Icons.account_balance_wallet_outlined, 2),
+    Task('My collections', Icons.payments_outlined, 2),
   ],
   'Mill Purchase': [
     Task('Wheat purchase', Icons.agriculture_outlined, 3),
@@ -60,7 +61,7 @@ const Map<String, List<Task>> roleTasks = {
   'Mill Dispatch': [Task('Send trucks', Icons.local_shipping_outlined, 2)],
   'Mill Driver': [
     Task('My deliveries', Icons.delivery_dining_outlined, 2),
-    Task('Collect payment', Icons.payments_outlined, 2),
+    Task('My collections', Icons.payments_outlined, 2),
   ],
   'Mill Accounts': [
     Task('Bills and payments', Icons.request_quote_outlined, 2),

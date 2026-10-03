@@ -43,58 +43,59 @@ void main() {
     expect(find.byKey(const Key('no-deliveries')), findsOneWidget);
   });
 
-  testWidgets('driver collects part payment, then the rest', (tester) async {
-    tester.view.physicalSize = const Size(800, 3600);
-    tester.view.devicePixelRatio = 2;
-    addTearDown(tester.view.reset);
-    final state = await demoAs(tester, 'Mill Driver');
-    await tester.tap(find.text('Collect payment'));
-    await tester.pumpAndSettle();
-    expect(find.text('Verma Distributors'), findsOneWidget);
+  testWidgets(
+    'accounts receives part payment on customer dues, then the rest',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 3600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      final state = await demoAs(tester, 'Mill Accounts');
+      await tester.tap(find.text('Customer dues'));
+      await tester.pumpAndSettle();
+      expect(find.text('Verma Distributors'), findsOneWidget);
 
-    // More than owed is refused
-    await tester.tap(find.byKey(const Key('receive-verma')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('amount')), '70000');
-    await tester.tap(find.byKey(const Key('receive-ok')));
-    await tester.pumpAndSettle();
-    expect((await state.client!.dues()).first.due, 60000);
+      // More than owed is refused
+      await tester.tap(find.byKey(const Key('receive-verma')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('amount')), '70000');
+      await tester.tap(find.byKey(const Key('receive-ok')));
+      await tester.pumpAndSettle();
+      expect((await state.client!.dues()).first.due, 60000);
 
-    await tester.tap(find.byKey(const Key('receive-verma')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('amount')), '25000');
-    await tester.tap(find.byKey(const Key('receive-ok')));
-    await tester.pumpAndSettle();
-    expect((await state.client!.dues()).first.due, 35000);
+      await tester.tap(find.byKey(const Key('receive-verma')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('amount')), '25000');
+      await tester.tap(find.byKey(const Key('receive-ok')));
+      await tester.pumpAndSettle();
+      expect((await state.client!.dues()).first.due, 35000);
 
-    await tester.tap(find.byKey(const Key('receive-verma')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Bank'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('receive-ok'))); // no UTR: refused
-    await tester.pumpAndSettle();
-    expect((await state.client!.dues()).first.due, 35000);
+      await tester.tap(find.byKey(const Key('receive-verma')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bank'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('receive-ok'))); // no UTR: refused
+      await tester.pumpAndSettle();
+      expect((await state.client!.dues()).first.due, 35000);
 
-    await tester.tap(find.byKey(const Key('receive-verma')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Bank'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('reference')), 'UTR123456');
-    await tester.tap(find.byKey(const Key('receive-ok')));
-    await tester.pumpAndSettle();
-    expect((await state.client!.dues()).map((d) => d.customer), ['sharma']);
-  });
+      await tester.tap(find.byKey(const Key('receive-verma')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bank'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('reference')), 'UTR123456');
+      await tester.tap(find.byKey(const Key('receive-ok')));
+      await tester.pumpAndSettle();
+      expect((await state.client!.dues()).map((d) => d.customer), ['sharma']);
+    },
+  );
 
-  testWidgets('sales rep looks at customer dues but cannot receive money', (
+  testWidgets('a sales rep sees My collections, not every customer\'s dues', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 3600);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await demoAs(tester, 'Mill Sales');
-    await tester.tap(find.text('Customer dues'));
-    await tester.pumpAndSettle();
-    expect(find.text('Verma Distributors'), findsOneWidget);
-    expect(find.byKey(const Key('receive-verma')), findsNothing);
+    expect(find.text('My collections'), findsOneWidget);
+    expect(find.text('Customer dues'), findsNothing);
   });
 }

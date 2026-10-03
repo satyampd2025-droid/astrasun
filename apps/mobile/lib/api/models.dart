@@ -50,6 +50,10 @@ class Order {
     this.creditBreach = false,
     this.stockShort = false,
     this.belowPrice = false,
+    this.billed = 0,
+    this.paid = 0,
+    this.withCollector = 0,
+    this.remaining = 0,
   }) : stage =
            stage ??
            (status == 'Pending Approval' ? 'Waiting for approval' : status),
@@ -73,6 +77,10 @@ class Order {
     creditBreach: j['credit_breach'] as bool? ?? false,
     stockShort: j['stock_short'] as bool? ?? false,
     belowPrice: j['below_min_price'] as bool? ?? false,
+    billed: (j['billed'] as num? ?? 0).toDouble(),
+    paid: (j['paid'] as num? ?? 0).toDouble(),
+    withCollector: (j['with_collector'] as num? ?? 0).toDouble(),
+    remaining: (j['remaining'] as num? ?? 0).toDouble(),
     items: [
       for (final i in j['items'] as List)
         OrderItem.fromJson(i as Map<String, dynamic>),
@@ -109,6 +117,13 @@ class Order {
   final bool creditBreach;
   final bool stockShort;
   final bool belowPrice;
+
+  /// Money on the order once it is billed: what was billed, what is paid and
+  /// handed in, what a rep or driver has collected but not handed in, and what is left.
+  final double billed;
+  final double paid;
+  final double withCollector;
+  final double remaining;
   final List<OrderItem> items;
 
   Order copyWith({
@@ -133,6 +148,10 @@ class Order {
     creditBreach: creditBreach,
     stockShort: stockShort,
     belowPrice: belowPrice,
+    billed: billed,
+    paid: paid,
+    withCollector: withCollector,
+    remaining: remaining,
   );
 }
 
@@ -637,4 +656,111 @@ class StockReport {
 
   final List<StockLine> lines;
   final bool reconciled;
+}
+
+/// Money taken from a shop on an order. It is Collected until the owner marks
+/// the cash handed in (Settled).
+class Collection {
+  const Collection({
+    required this.name,
+    required this.salesOrder,
+    required this.customerName,
+    required this.amount,
+    required this.mode,
+    required this.status,
+    this.collectedByName,
+  });
+
+  factory Collection.fromJson(Map<String, dynamic> j) => Collection(
+    name: j['name'] as String,
+    salesOrder: j['sales_order'] as String,
+    customerName: (j['customer_name'] as String?) ?? '',
+    amount: (j['amount'] as num).toDouble(),
+    mode: (j['mode'] as String?) ?? 'Cash',
+    status: j['status'] as String,
+    collectedByName: j['collected_by_name'] as String?,
+  );
+
+  final String name;
+  final String salesOrder;
+  final String customerName;
+  final double amount;
+  final String mode;
+  final String status;
+  final String? collectedByName;
+}
+
+/// An order that still has money to collect, or money not yet handed in.
+class OrderMoney {
+  const OrderMoney({
+    required this.salesOrder,
+    required this.customerName,
+    required this.billed,
+    required this.paid,
+    required this.withCollector,
+    required this.remaining,
+  });
+
+  factory OrderMoney.fromJson(Map<String, dynamic> j) => OrderMoney(
+    salesOrder: j['sales_order'] as String,
+    customerName: (j['customer_name'] as String?) ?? '',
+    billed: (j['billed'] as num).toDouble(),
+    paid: (j['paid'] as num).toDouble(),
+    withCollector: (j['with_collector'] as num).toDouble(),
+    remaining: (j['remaining'] as num).toDouble(),
+  );
+
+  final String salesOrder;
+  final String customerName;
+  final double billed;
+  final double paid;
+  final double withCollector;
+  final double remaining;
+}
+
+/// A rep's or driver's money screen: cash they hold and orders to collect on.
+class MyCollections {
+  const MyCollections({
+    required this.holding,
+    required this.collections,
+    required this.orders,
+  });
+
+  factory MyCollections.fromJson(Map<String, dynamic> j) => MyCollections(
+    holding: (j['holding'] as num).toDouble(),
+    collections: [
+      for (final c in j['collections'] as List)
+        Collection.fromJson(c as Map<String, dynamic>),
+    ],
+    orders: [
+      for (final o in j['orders'] as List)
+        OrderMoney.fromJson(o as Map<String, dynamic>),
+    ],
+  );
+
+  final double holding;
+  final List<Collection> collections;
+  final List<OrderMoney> orders;
+}
+
+/// Cash one person holds, waiting for the owner to mark it handed in.
+class CashHolder {
+  const CashHolder({
+    required this.name,
+    required this.total,
+    required this.collections,
+  });
+
+  factory CashHolder.fromJson(Map<String, dynamic> j) => CashHolder(
+    name: j['name'] as String,
+    total: (j['total'] as num).toDouble(),
+    collections: [
+      for (final c in j['collections'] as List)
+        Collection.fromJson(c as Map<String, dynamic>),
+    ],
+  );
+
+  final String name;
+  final double total;
+  final List<Collection> collections;
 }

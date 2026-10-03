@@ -12,10 +12,12 @@ import 'deliveries_screen.dart';
 import 'dues_screen.dart';
 import 'load_changes_screen.dart';
 import 'loading_screen.dart';
+import 'my_collections_screen.dart';
 import 'new_order_screen.dart';
 import 'order_list_screen.dart';
 import 'production_screens.dart';
 import 'reports_screen.dart';
+import 'settle_cash_screen.dart';
 import 'trucks_screen.dart';
 import 'vehicles_screen.dart';
 import 'wheat_screens.dart';
@@ -300,6 +302,8 @@ Widget _screenFor(Task task, ErpNextClient client, S s, bool collect) =>
       'My deliveries' => DeliveriesScreen(client: client),
       'Vehicles' => VehiclesScreen(client: client),
       'Load changes' => LoadChangesScreen(client: client),
+      'My collections' => MyCollectionsScreen(client: client),
+      'Settle cash' => SettleCashScreen(client: client),
       'Collect payment' ||
       'Customer dues' => DuesScreen(client: client, canCollect: collect),
       'Truck entry' || 'Wheat purchase' => GateEntryScreen(client: client),

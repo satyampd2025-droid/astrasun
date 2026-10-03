@@ -496,6 +496,106 @@ class DemoClient extends ErpNextClient {
     return _setTask(task.id, (t) => t.copyWith(status: 'Delivered'));
   }
 
+  /// Money collected on demo orders, and which of it the owner has settled.
+  final List<Collection> _collections = [];
+  int _collectionNo = 0;
+
+  OrderMoney _moneyOn(String salesOrder, String customerName) {
+    final truck = _loading.where((t) => t.salesOrder == salesOrder).firstOrNull;
+    final billed = truck?.invoice == null ? 0.0 : _worth(truck!.items);
+    final mine = _collections.where((c) => c.salesOrder == salesOrder);
+    double sum(bool settled) => mine
+        .where((c) => (c.status == 'Settled') == settled)
+        .fold(0.0, (a, c) => a + c.amount);
+    return OrderMoney(
+      salesOrder: salesOrder,
+      customerName: customerName,
+      billed: billed,
+      paid: sum(true),
+      withCollector: sum(false),
+      remaining: billed - sum(true) - sum(false),
+    );
+  }
+
+  @override
+  Future<Collection> collectOnOrder(
+    String salesOrder,
+    double amount,
+    String mode,
+    String reference,
+  ) async {
+    final truck = _loading.firstWhere(
+      (t) => t.salesOrder == salesOrder,
+      orElse: () => throw Exception('order'),
+    );
+    final left = _moneyOn(salesOrder, truck.customerName).remaining;
+    if (amount <= 0 || amount > left) throw Exception('amount');
+    if (mode == 'Bank' && reference.trim().isEmpty) throw Exception('utr');
+    final office = role == 'Mill Owner' || role == 'Mill Accounts';
+    final c = Collection(
+      name: 'COL-${++_collectionNo}',
+      salesOrder: salesOrder,
+      customerName: truck.customerName,
+      amount: amount,
+      mode: mode,
+      status: office ? 'Settled' : 'Collected',
+      collectedByName: 'You',
+    );
+    _collections.add(c);
+    return c;
+  }
+
+  @override
+  Future<MyCollections> myCollections() async {
+    final held = [
+      for (final c in _collections)
+        if (c.status == 'Collected') c,
+    ];
+    final orders = [
+      for (final t in _loading)
+        if (t.invoice != null) _moneyOn(t.salesOrder, t.customerName),
+    ].where((o) => o.remaining > 0 || o.withCollector > 0).toList();
+    return MyCollections(
+      holding: held.fold(0.0, (a, c) => a + c.amount),
+      collections: held,
+      orders: orders,
+    );
+  }
+
+  @override
+  Future<List<CashHolder>> cashToSettle() async {
+    final held = [
+      for (final c in _collections)
+        if (c.status == 'Collected') c,
+    ];
+    if (held.isEmpty) return [];
+    return [
+      CashHolder(
+        name: 'Rep',
+        total: held.fold(0.0, (a, c) => a + c.amount),
+        collections: held,
+      ),
+    ];
+  }
+
+  @override
+  Future<void> settleCash(List<String> names) async {
+    for (var i = 0; i < _collections.length; i++) {
+      final c = _collections[i];
+      if (names.contains(c.name)) {
+        _collections[i] = Collection(
+          name: c.name,
+          salesOrder: c.salesOrder,
+          customerName: c.customerName,
+          amount: c.amount,
+          mode: c.mode,
+          status: 'Settled',
+          collectedByName: c.collectedByName,
+        );
+      }
+    }
+  }
+
   final List<Due> _dues = [
     const Due(
       customer: 'verma',

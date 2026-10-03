@@ -367,6 +367,40 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
+  /// Mark money collected on an order (the owner or accounts settle it at once).
+  Future<Collection> collectOnOrder(
+    String salesOrder,
+    double amount,
+    String mode,
+    String reference,
+  ) async => Collection.fromJson(
+    _message(
+          await _post('astrasun.receipts.collect', {
+            'sales_order': salesOrder,
+            'amount': amount,
+            'mode': mode,
+            'reference': reference,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
+  Future<MyCollections> myCollections() async => MyCollections.fromJson(
+    _message(await _post('astrasun.receipts.my_collections', {}))
+        as Map<String, dynamic>,
+  );
+
+  /// Cash collected and not yet handed in, by who holds it (owner, accounts).
+  Future<List<CashHolder>> cashToSettle() async => [
+    for (final h
+        in _message(await _post('astrasun.receipts.to_settle', {})) as List)
+      CashHolder.fromJson(h as Map<String, dynamic>),
+  ];
+
+  Future<void> settleCash(List<String> names) async {
+    _message(await _post('astrasun.receipts.settle', {'names': names}));
+  }
+
   Future<List<Due>> dues() async => [
     for (final d in _message(await _post('astrasun.payments.dues', {})) as List)
       Due.fromJson(d as Map<String, dynamic>),

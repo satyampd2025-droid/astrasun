@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/erpnext_client.dart';
 import '../api/models.dart';
 import '../strings.dart';
+import '../widgets/collect_dialog.dart';
 import '../widgets/order_card.dart';
 import '../widgets/pull_to_reload.dart';
 import '../widgets/voice_text_field.dart';
@@ -61,6 +62,37 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
       messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
     }
     _reload();
+  }
+
+  Future<void> _collect(LoadingTask t) async {
+    final s = S.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final got = await askCollection(
+      context,
+      title: t.customerName,
+      remaining: _total(t),
+    );
+    if (got == null || !mounted) return;
+    try {
+      await widget.client.collectOnOrder(
+        t.salesOrder,
+        got.amount,
+        got.mode,
+        got.reference,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            s.t('Collected ₹ {0} from {1}', [
+              got.amount.round().toString(),
+              t.customerName,
+            ]),
+          ),
+        ),
+      );
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
+    }
   }
 
   /// The bill total once billed, else what the items add up to.
@@ -182,6 +214,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
                         ),
                       ),
                     const SizedBox(height: 12),
+                    if (t.invoice != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: OutlinedButton.icon(
+                          key: Key('collect-${t.id}'),
+                          icon: const Icon(Icons.payments_outlined),
+                          label: Text(s.t('Collect payment')),
+                          onPressed: () => _collect(t),
+                        ),
+                      ),
                     if (t.status == 'Dispatched')
                       FilledButton.icon(
                         key: Key('deliver-${t.id}'),

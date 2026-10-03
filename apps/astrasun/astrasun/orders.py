@@ -19,7 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
 
-from astrasun import audit, stages
+from astrasun import audit, receipts, stages
 
 APPROVER_ROLES = ("Mill Owner", "Mill Manager")
 OWNER_ROLE = "Mill Owner"
@@ -222,7 +222,7 @@ def _facts(names):
 
 	Four small queries for a whole list, not four per order.
 	"""
-	facts = {n: {"trucks": [], "billed": 0.0, "outstanding": 0.0} for n in names}
+	facts = {n: {"trucks": [], "billed": 0.0, "outstanding": 0.0, "pending": 0.0} for n in names}
 	if not names:
 		return facts
 
@@ -268,6 +268,8 @@ def _facts(names):
 			if row.parent in bills:
 				facts[row.sales_order]["billed"] += flt(bills[row.parent].grand_total)
 				facts[row.sales_order]["outstanding"] += flt(bills[row.parent].outstanding_amount)
+	for name, pending in receipts.pending_by_order(names).items():
+		facts[name]["pending"] = pending
 	return facts
 
 
@@ -279,7 +281,8 @@ def summary(doc, facts=None):
 		trucks=fact["trucks"],
 		fully_delivered=flt(doc.per_delivered) >= 100,
 		billed=fact["billed"],
-		outstanding=fact["outstanding"],
+		# Money collected but not yet handed in already counts as paid on the order
+		outstanding=max(fact["outstanding"] - fact["pending"], 0),
 		cancelled=doc.docstatus == 2,
 	)
 	return {
@@ -291,6 +294,10 @@ def summary(doc, facts=None):
 		"tone": stage["tone"],
 		"timeline": stage["timeline"],
 		"total": flt(doc.grand_total),
+		"billed": fact["billed"],
+		"paid": fact["billed"] - fact["outstanding"],
+		"with_collector": fact["pending"],
+		"remaining": max(fact["outstanding"] - fact["pending"], 0),
 		"delivery_date": str(doc.delivery_date),
 		"submitted_by": doc.astrasun_submitted_by,
 		"approved_by": doc.astrasun_approved_by,
