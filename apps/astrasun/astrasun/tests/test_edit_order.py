@@ -44,6 +44,10 @@ class TestEditOrder(MillFixture):
 		frappe.set_user(self.manager)
 		self.assertEqual([o["name"] for o in orders.pending_approvals()], [name])
 		approved = orders.approve(name, "OK")
+		# ERPNext amends a submitted order: the old one is cancelled and the new one carries its number
+		self.assertEqual(approved["name"], f"{name}-1")
+		self.assertEqual(frappe.db.get_value("Sales Order", name, "docstatus"), 2)
+		self.assertEqual(approved["submitted_by"], self.rep)
 		self.assertEqual(approved["stage"], "Approved")
 		self.assertIsNone(approved["edit"])
 		by_item = {i["item_code"]: i["qty"] for i in approved["items"]}
@@ -56,7 +60,7 @@ class TestEditOrder(MillFixture):
 			self.rep, name, [{"item_code": ITEM, "qty": 5}, {"item_code": OTHER, "qty": 2, "rate": 400}]
 		)
 		frappe.set_user(self.manager)
-		orders.approve(name)
+		name = orders.approve(name)["name"]
 		self._edit(self.rep, name, [{"item_code": OTHER, "qty": 2}])
 		frappe.set_user(self.manager)
 		done = orders.approve(name)
@@ -85,7 +89,7 @@ class TestEditOrder(MillFixture):
 			invoicing.dispatch(task["name"])
 		self.assertTrue(loading.queue()["loading"][0]["change_requested"])
 		frappe.set_user(self.manager)
-		orders.approve(name)
+		name = orders.approve(name)["name"]
 		# The old bill is cancelled, the old load is gone and the order is back in the queue
 		self.assertEqual(frappe.db.get_value("Sales Invoice", bill, "docstatus"), 2)
 		self.assertFalse(frappe.db.exists("Delivery Note", task["name"]))
