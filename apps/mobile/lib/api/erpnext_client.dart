@@ -240,6 +240,35 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
+  /// The vehicles to pick from at loading; [all] adds the unavailable ones (managers).
+  Future<List<Vehicle>> vehicles({bool all = false}) async => [
+    for (final v
+        in _message(
+              await _post('astrasun.vehicles.vehicles', {'all': all ? 1 : 0}),
+            )
+            as List)
+      Vehicle.fromJson(v as Map<String, dynamic>),
+  ];
+
+  Future<Vehicle> saveVehicle({
+    required String vehicleNo,
+    required String driverName,
+    String? driverPhone,
+    String? driverUser,
+    bool enabled = true,
+  }) async => Vehicle.fromJson(
+    _message(
+          await _post('astrasun.vehicles.save', {
+            'vehicle_no': vehicleNo,
+            'driver_name': driverName,
+            'driver_phone': driverPhone,
+            'driver_user': driverUser,
+            'enabled': enabled ? 1 : 0,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
   List<LoadingTask> _trucks(dynamic list) => [
     for (final t in list as List)
       LoadingTask.fromJson(t as Map<String, dynamic>),

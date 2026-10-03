@@ -37,9 +37,25 @@ class MillFixture(FrappeTestCase):
 		self.owner = _user("owner@example.com", "Mill Owner")
 		self.warehouse = f"Finished Goods - {self.abbr}"
 		self._stock(100)
+		self._vehicle("MP09AB1234", "driver@example.com", "Ramesh Driver")
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
+
+	def _vehicle(self, plate, driver_email, driver_name, phone="9800000001"):
+		"""A vehicle on the owner's list, with a driver who has an app login."""
+		_user(driver_email, "Mill Driver")
+		if not frappe.db.exists("Mill Vehicle", plate):
+			frappe.get_doc(
+				{
+					"doctype": "Mill Vehicle",
+					"vehicle_no": plate,
+					"driver_name": driver_name,
+					"driver_phone": phone,
+					"driver_user": driver_email,
+				}
+			).insert()
+		return plate
 
 	def _open_fiscal_year(self):
 		"""ERPNext's test fixtures limit the fiscal year to their own test companies."""

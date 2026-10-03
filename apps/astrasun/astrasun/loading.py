@@ -1,19 +1,21 @@
 """Loading: the warehouse loads an approved order onto a vehicle.
 
 An approved Sales Order shows in the loading queue. The loader starts a loading
-task (a draft Delivery Note), types the vehicle number, and marks it loaded with
-the bags actually put on the truck. The Delivery Note stays a draft: dispatch
+task (a draft Delivery Note), picks the vehicle from the list the owner keeps
+(the vehicle's driver comes with it), and marks it loaded with the bags actually
+put on the truck. The Delivery Note stays a draft: dispatch
 (submitting it) waits for the invoice, per DECISIONS D5.
 """
 
 import json
+import re
 from contextlib import contextmanager
 
 import frappe
 from frappe import _
 from frappe.utils import flt
 
-from astrasun import stages
+from astrasun import stages, vehicles
 
 LOADER_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 LOADING, LOADED = "Loading", "Loaded"
@@ -38,6 +40,31 @@ def _check_role():
 		frappe.throw(_("Only warehouse staff can load orders"), frappe.PermissionError)
 
 
+def _assign_vehicle(dn, vehicle_no):
+	"""Put the vehicle, and with it its driver, on the loading task."""
+	vehicle = vehicles.find(vehicle_no)
+	if not vehicle:
+		frappe.throw(_("Pick a vehicle from the list"), LoadingError)
+	dn.astrasun_vehicle_no = vehicle.vehicle_no
+	dn.astrasun_driver_name = vehicle.driver_name
+	dn.astrasun_driver_phone = vehicle.driver_phone
+	dn.astrasun_driver_user = vehicle.driver_user
+
+
+def _address(dn):
+	"""Where to deliver, as one line of plain text."""
+	text = dn.shipping_address or dn.address_display
+	if not text:
+		text = frappe.db.get_value("Customer", dn.customer, "primary_address") or ""
+	text = re.sub(r"<br\s*/?>|</div>|\n", ", ", text)
+	text = re.sub(r"<[^>]+>", "", text)
+	return re.sub(r"\s*,(\s*,)+", ",", " ".join(text.split())).strip(" ,")
+
+
+def _phone(dn):
+	return dn.contact_mobile or frappe.db.get_value("Customer", dn.customer, "mobile_no")
+
+
 def _task(dn):
 	return {
 		"name": dn.name,
@@ -47,9 +74,20 @@ def _task(dn):
 		"status": dn.astrasun_loading_status,
 		"stage": stages.truck_stage(dn.astrasun_loading_status),
 		"vehicle_no": dn.astrasun_vehicle_no,
+		"driver_name": dn.astrasun_driver_name,
+		"driver_phone": dn.astrasun_driver_phone,
+		"address": _address(dn),
+		"customer_phone": _phone(dn),
 		"loaded_by": dn.astrasun_loaded_by,
 		"items": [
-			{"item_code": r.item_code, "item_name": r.item_name, "qty": flt(r.qty)} for r in dn.items
+			{
+				"item_code": r.item_code,
+				"item_name": r.item_name,
+				"qty": flt(r.qty),
+				"rate": flt(r.rate),
+				"amount": flt(r.amount),
+			}
+			for r in dn.items
 		],
 	}
 
@@ -94,7 +132,9 @@ def queue():
 
 @frappe.whitelist()
 def start(sales_order, vehicle_no=None):
-	"""Start loading an approved order: creates the draft Delivery Note."""
+	"""Start loading an approved order: creates the draft Delivery Note.
+
+	The vehicle can be picked now or when the load is marked done."""
 	_check_role()
 	from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
 
@@ -111,7 +151,8 @@ def start(sales_order, vehicle_no=None):
 	with _as_system():
 		dn = make_delivery_note(sales_order)
 		dn.astrasun_loading_status = LOADING
-		dn.astrasun_vehicle_no = (vehicle_no or "").strip().upper() or None
+		if (vehicle_no or "").strip():
+			_assign_vehicle(dn, vehicle_no)
 		dn.insert()
 		dn.db_set("owner", user, update_modified=False)
 	return _task(dn)
@@ -121,9 +162,8 @@ def start(sales_order, vehicle_no=None):
 def mark_loaded(name, vehicle_no, items=None):
 	"""Record the vehicle and the bags actually loaded; `items` is [{item_code, qty}]."""
 	_check_role()
-	vehicle_no = (vehicle_no or "").strip().upper()
-	if not vehicle_no:
-		frappe.throw(_("Enter the vehicle number"), LoadingError)
+	if not (vehicle_no or "").strip():
+		frappe.throw(_("Pick the vehicle"), LoadingError)
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADING:
 		frappe.throw(_("This loading task is not open"), LoadingError)
@@ -139,7 +179,7 @@ def mark_loaded(name, vehicle_no, items=None):
 			r.qty = loaded[r.item_code]
 	if not dn.items:
 		frappe.throw(_("Nothing was loaded"), LoadingError)
-	dn.astrasun_vehicle_no = vehicle_no
+	_assign_vehicle(dn, vehicle_no)
 	dn.astrasun_loading_status = LOADED
 	dn.astrasun_loaded_by = frappe.session.user
 	with _as_system():

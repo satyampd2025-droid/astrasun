@@ -26,7 +26,7 @@ class TestLoading(MillFixture):
 		self.assertIn(so, [w["sales_order"] for w in loading.queue()["waiting"]])
 		task = loading.start(so, "mp 09 ab 1234")
 		self.assertEqual(task["status"], "Loading")
-		self.assertEqual(task["vehicle_no"], "MP 09 AB 1234")
+		self.assertEqual(task["vehicle_no"], "MP09AB1234")  # the vehicle as the owner listed it
 		queue = loading.queue()
 		self.assertNotIn(so, [w["sales_order"] for w in queue["waiting"]])
 		self.assertIn(task["name"], [t["name"] for t in queue["loading"]])

@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'orders_test.dart' show demoAs;
 
 void main() {
-  testWidgets('loader starts loading, enters the vehicle and marks loaded', (
+  testWidgets('loader starts loading, picks the vehicle and marks loaded', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 3600);
@@ -24,10 +24,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Loading'), findsWidgets);
 
-    // Vehicle number is required
+    // The vehicle must be picked
     await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
     await tester.pumpAndSettle();
-    expect(find.text('Enter the vehicle number'), findsOneWidget);
+    expect(find.text('Pick the vehicle'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('less-ATTA-50KG')));
     await tester.pump();
@@ -35,13 +35,12 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('qty-ATTA-50KG'))).data,
       '39',
     );
-    await tester.enterText(
-      find.descendant(
-        of: find.byKey(const Key('vehicle-SAL-ORD-0000')),
-        matching: find.byType(TextField),
-      ),
-      'MP09AB1234',
-    );
+    await tester.tap(find.byKey(const Key('vehicle-SAL-ORD-0000')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('MP09AB1234 - Ramesh Driver').last);
+    await tester.pumpAndSettle();
+    // The driver comes with the vehicle
+    expect(find.text('Driver Ramesh Driver'), findsOneWidget);
     await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.textContaining('MP09AB1234'), findsOneWidget);

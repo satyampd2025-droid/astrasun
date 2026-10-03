@@ -213,6 +213,8 @@ class DemoClient extends ErpNextClient {
         salesOrder: done.name,
         customerName: done.customerName,
         status: 'Waiting',
+        address: 'Main Bazaar, Indore',
+        customerPhone: '9800000002',
         items: done.items,
       ),
     );
@@ -225,18 +227,20 @@ class DemoClient extends ErpNextClient {
       salesOrder: 'SAL-ORD-0000',
       customerName: 'Sharma Kirana Store',
       status: 'Waiting',
+      address: 'Shop 4, Main Bazaar, Indore',
+      customerPhone: '9800000002',
       items: [
         OrderItem(
           itemCode: 'ATTA-50KG',
           itemName: 'Atta 50 kg',
           qty: 40,
-          rate: 0,
+          rate: 2150,
         ),
         OrderItem(
           itemCode: 'ATTA-10KG',
           itemName: 'Atta 10 kg',
           qty: 20,
-          rate: 0,
+          rate: 440,
         ),
       ],
     ),
@@ -259,18 +263,70 @@ class DemoClient extends ErpNextClient {
     return _setTask(task.id, (t) => t.copyWith(status: 'Loading'));
   }
 
+  final List<Vehicle> _vehicles = [
+    const Vehicle(
+      vehicleNo: 'MP09AB1234',
+      driverName: 'Ramesh Driver',
+      driverPhone: '9800000001',
+      driverUser: 'ramesh',
+    ),
+    const Vehicle(
+      vehicleNo: 'MP09CD5678',
+      driverName: 'Suresh Kumar',
+      driverPhone: '9800000003',
+    ),
+  ];
+
+  @override
+  Future<List<Vehicle>> vehicles({bool all = false}) async => [
+    for (final v in _vehicles)
+      if (all || v.enabled) v,
+  ];
+
+  @override
+  Future<Vehicle> saveVehicle({
+    required String vehicleNo,
+    required String driverName,
+    String? driverPhone,
+    String? driverUser,
+    bool enabled = true,
+  }) async {
+    final key = vehicleNo.replaceAll(RegExp(r'[\s-]+'), '').toUpperCase();
+    if (key.isEmpty || driverName.trim().isEmpty) throw Exception('vehicle');
+    final v = Vehicle(
+      vehicleNo: key,
+      driverName: driverName.trim(),
+      driverPhone: driverPhone,
+      driverUser: driverUser,
+      enabled: enabled,
+    );
+    final i = _vehicles.indexWhere((x) => x.vehicleNo == key);
+    if (i < 0) {
+      _vehicles.add(v);
+    } else {
+      _vehicles[i] = v;
+    }
+    return v;
+  }
+
   @override
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
     Map<String, int> loaded,
   ) async {
+    final vehicle = _vehicles.firstWhere(
+      (v) => v.enabled && v.vehicleNo == vehicleNo,
+      orElse: () => throw Exception('vehicle'),
+    );
     _follow(task.salesOrder, 4);
     return _setTask(
       task.id,
       (t) => t.copyWith(
         status: 'Loaded',
-        vehicleNo: vehicleNo,
+        vehicleNo: vehicle.vehicleNo,
+        driverName: vehicle.driverName,
+        driverPhone: vehicle.driverPhone,
         items: [
           for (final i in t.items)
             if ((loaded[i.itemCode] ?? 0) > 0)
@@ -278,7 +334,7 @@ class DemoClient extends ErpNextClient {
                 itemCode: i.itemCode,
                 itemName: i.itemName,
                 qty: loaded[i.itemCode]!.toDouble(),
-                rate: 0,
+                rate: i.rate,
               ),
         ],
       ),
@@ -330,7 +386,9 @@ class DemoClient extends ErpNextClient {
   @override
   Future<List<LoadingTask>> myDeliveries() async => [
     for (final t in _loading)
-      if (t.status == 'Dispatched') t,
+      if (const ['Loading', 'Loaded', 'Dispatched'].contains(t.status) &&
+          t.vehicleNo != null)
+        t,
   ];
 
   @override
