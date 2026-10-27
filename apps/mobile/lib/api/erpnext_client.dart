@@ -387,11 +387,19 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
-  Future<LoadingTask> dispatchTruck(LoadingTask task) async =>
-      LoadingTask.fromJson(
-        _message(await _post('astrasun.invoicing.dispatch', {'name': task.id}))
-            as Map<String, dynamic>,
-      );
+  /// `batches` fills in the batch of bag items that were loaded without one.
+  Future<LoadingTask> dispatchTruck(
+    LoadingTask task, {
+    Map<String, String> batches = const {},
+  }) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.invoicing.dispatch', {
+            'name': task.id,
+            if (batches.isNotEmpty) 'batches': batches,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
 
   Future<List<LoadingTask>> myDeliveries() async =>
       _trucks(_message(await _post('astrasun.delivery.my_deliveries', {})));

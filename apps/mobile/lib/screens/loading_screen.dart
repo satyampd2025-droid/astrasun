@@ -65,6 +65,36 @@ class _LoadingScreenState extends State<LoadingScreen> {
     _reload();
   }
 
+  /// Truck left. A truck loaded without a batch asks for one here instead of failing.
+  Future<void> _truckLeft(LoadingTask t) async {
+    final s = S.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.client.dispatchTruck(t);
+    } on ServerRefused catch (e) {
+      if (!e.reason.startsWith('Choose the batch')) {
+        messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
+      } else {
+        if (!mounted) return;
+        final batches = await showDialog<Map<String, String>>(
+          context: context,
+          builder: (_) =>
+              _BatchDialog(task: t, load: widget.client.batchesInStock),
+        );
+        if (batches != null) {
+          try {
+            await widget.client.dispatchTruck(t, batches: batches);
+          } on Exception catch (e2) {
+            messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e2))));
+          }
+        }
+      }
+    } on Exception catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
+    }
+    _reload();
+  }
+
   /// Print bill: bills the truck if it has no bill yet, then opens the print screen.
   Future<void> _printBill(LoadingTask t) async {
     final s = S.of(context);
@@ -134,7 +164,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
                 ),
               ),
               onPrint: () => _printBill(t),
-              onLeft: () => _run(() => widget.client.dispatchTruck(t)),
+              onLeft: () => _truckLeft(t),
               onChange: () => _edit(t),
             ),
         ],
@@ -409,6 +439,82 @@ class _TaskCardState extends State<_TaskCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Asks for the batch of each bag item that was loaded without one.
+class _BatchDialog extends StatefulWidget {
+  const _BatchDialog({required this.task, required this.load});
+  final LoadingTask task;
+  final Future<List<BatchStock>> Function(String itemCode) load;
+
+  @override
+  State<_BatchDialog> createState() => _BatchDialogState();
+}
+
+class _BatchDialogState extends State<_BatchDialog> {
+  final Map<String, List<BatchStock>> _stock = {};
+  final Map<String, String> _chosen = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (final i in widget.task.items) {
+      widget
+          .load(i.itemCode)
+          .then((b) {
+            if (mounted) setState(() => _stock[i.itemCode] = b);
+          })
+          .catchError((_) {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    return AlertDialog(
+      title: Text(s.t('Pick the batch')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final i in widget.task.items)
+              if ((_stock[i.itemCode] ?? []).isNotEmpty)
+                DropdownButtonFormField<String>(
+                  key: Key('left-batch-${i.itemCode}'),
+                  isExpanded: true,
+                  initialValue: _chosen[i.itemCode],
+                  decoration: InputDecoration(
+                    labelText: '${i.itemName} - ${s.t('Batch')}',
+                  ),
+                  items: [
+                    for (final b in _stock[i.itemCode]!)
+                      DropdownMenuItem(
+                        value: b.batchNo,
+                        child: Text(
+                          '${b.batchNo} (${b.qty.round()} ${s.t('bags')})',
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) => setState(() => _chosen[i.itemCode] = v!),
+                ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(s.t('Cancel')),
+        ),
+        FilledButton(
+          key: const Key('left-batch-ok'),
+          onPressed: _chosen.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_chosen),
+          child: Text(s.t('Truck left')),
+        ),
+      ],
     );
   }
 }

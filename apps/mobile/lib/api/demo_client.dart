@@ -570,7 +570,10 @@ class DemoClient extends ErpNextClient {
   });
 
   @override
-  Future<LoadingTask> dispatchTruck(LoadingTask task) async {
+  Future<LoadingTask> dispatchTruck(
+    LoadingTask task, {
+    Map<String, String> batches = const {},
+  }) async {
     // The truck leaving is the delivery: there is no driver step
     _follow(
       task.salesOrder,
