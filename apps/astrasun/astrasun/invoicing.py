@@ -5,6 +5,7 @@ Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
 which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
+import json
 import re
 
 import frappe
@@ -167,9 +168,33 @@ def _needs_batch(dn):
 	]
 
 
+def _pick_batches(dn, chosen):
+	"""Put the chosen batch on the rows that have none, checking the batch has the bags."""
+	from astrasun.loading import _batch_stock
+
+	wanted = {}
+	for r in dn.items:
+		batch = (chosen.get(r.item_code) or "").strip()
+		if r.batch_no or r.serial_and_batch_bundle or not batch:
+			continue
+		if frappe.db.get_value("Batch", batch, "item") != r.item_code:
+			frappe.throw(_("Batch {0} is not a batch of {1}").format(batch, r.item_code), InvoicingError)
+		wanted[(r.item_code, batch)] = wanted.get((r.item_code, batch), 0) + flt(r.qty)
+		r.batch_no = batch
+		r.use_serial_batch_fields = 1
+		if wanted[(r.item_code, batch)] > _batch_stock(r.item_code, r.warehouse, batch):
+			frappe.throw(
+				_("Batch {0} does not have {1} bags").format(batch, wanted[(r.item_code, batch)]),
+				InvoicingError,
+			)
+
+
 @frappe.whitelist()
-def dispatch(name):
-	"""Let the truck leave. Needs an invoice."""
+def dispatch(name, batches=None):
+	"""Let the truck leave. Needs an invoice.
+
+	`batches` ({item_code: batch_no}) fills in the batch of bag items the warehouse did not pick while
+	loading, so a truck loaded before batches were asked for can still leave."""
 	_require(DISPATCH_ROLES, "Only dispatch staff can send trucks")
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADED:
@@ -178,6 +203,8 @@ def dispatch(name):
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
 	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
+	if batches:
+		_pick_batches(dn, json.loads(batches) if isinstance(batches, str) else batches)
 	missing = [] if frappe.flags.in_test else _needs_batch(dn)  # ERPNext skips its own check while testing
 	if missing:
 		frappe.throw(

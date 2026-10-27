@@ -18,7 +18,7 @@ concurrency:
 
 env:
   ADMIN_PASSWORD: ci-admin-pass-1
-  MODULES: test_order_stages test_acceptance
+  MODULES: test_invoicing test_receipts test_order_stages
 
 jobs:
   stages:

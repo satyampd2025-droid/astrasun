@@ -153,3 +153,17 @@ class TestInvoicing(MillFixture):
 		self._real_server()
 		with self.assertRaises(invoicing.InvoicingError):
 			invoicing.dispatch(dn)
+
+	def test_a_truck_loaded_without_a_batch_leaves_once_the_batch_is_chosen(self):
+		self._stock(20)
+		so, dn = self._loaded(qty=4)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		self._real_server()
+		batch = loading.batches(ITEM)["batches"][0]["batch_no"]
+		with self.assertRaises(invoicing.InvoicingError):
+			invoicing.dispatch(dn, {ITEM: "NOPE"})
+		self.assertEqual(invoicing.dispatch(dn, {ITEM: batch})["status"], "Delivered")
+		rows = frappe.get_all("Delivery Note Item", filters={"parent": dn}, fields=["batch_no"])
+		self.assertEqual([r.batch_no for r in rows], [batch])
