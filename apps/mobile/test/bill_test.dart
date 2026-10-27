@@ -40,8 +40,8 @@ void main() {
     await tester.tap(find.text('Loading queue'));
     await tester.pumpAndSettle();
 
-    // No bill yet, so the truck cannot be sent
-    expect(find.byKey(const Key('left-SAL-ORD-0000')), findsNothing);
+    // The truck can be sent without waiting for the bill to be printed
+    expect(find.byKey(const Key('left-SAL-ORD-0000')), findsOneWidget);
     await tester.tap(find.byKey(const Key('print-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(printed, ['SINV-0000']);

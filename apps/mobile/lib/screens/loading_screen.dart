@@ -70,7 +70,11 @@ class _LoadingScreenState extends State<LoadingScreen> {
     final s = S.of(context);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await widget.client.dispatchTruck(t);
+      // The bill is made first when the warehouse has not printed one
+      final billed = t.invoice == null
+          ? await widget.client.invoiceTruck(t)
+          : t;
+      await widget.client.dispatchTruck(billed);
     } on ServerRefused catch (e) {
       if (!e.reason.startsWith('Choose the batch')) {
         messenger.showSnackBar(SnackBar(content: Text(s.saveFailed(e))));
@@ -316,15 +320,13 @@ class _TaskCardState extends State<_TaskCard> {
                   label: Text(s.t('Print bill')),
                   onPressed: widget.onPrint,
                 ),
-                if (t.invoice != null) ...[
-                  const SizedBox(height: 8),
-                  FilledButton.tonalIcon(
-                    key: Key('left-${t.id}'),
-                    icon: const Icon(Icons.local_shipping_outlined),
-                    label: Text(s.t('Truck left')),
-                    onPressed: widget.onLeft,
-                  ),
-                ],
+                const SizedBox(height: 8),
+                FilledButton.tonalIcon(
+                  key: Key('left-${t.id}'),
+                  icon: const Icon(Icons.local_shipping_outlined),
+                  label: Text(s.t('Truck left')),
+                  onPressed: widget.onLeft,
+                ),
               ],
             ],
             if (t.changeRequested)
