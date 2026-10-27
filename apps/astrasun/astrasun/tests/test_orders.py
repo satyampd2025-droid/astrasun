@@ -97,6 +97,7 @@ class TestOrders(MillFixture):
 					"item_code": code,
 					"item_name": "Own flour",
 					"item_group": "Bulk Flour",
+					"gst_hsn_code": "11010000",
 					"stock_uom": "Nos",
 					"is_sales_item": 1,
 				}
