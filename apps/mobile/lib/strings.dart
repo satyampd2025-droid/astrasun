@@ -60,6 +60,7 @@ const Map<String, Map<String, String>> _strings = {
     'Reject': 'मना करें',
     'Send back': 'वापस भेजें',
     'Reason': 'कारण',
+    'Write a reason first': 'पहले कारण लिखें',
     'Done': 'ठीक है',
     'No orders waiting for you': 'आपके लिए कोई ऑर्डर बाकी नहीं',
     'No orders yet': 'अभी कोई ऑर्डर नहीं',

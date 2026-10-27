@@ -44,13 +44,17 @@ class Me {
 
 /// Talks to ERPNext over its REST API with a session cookie.
 class ErpNextClient {
-  ErpNextClient(String baseUrl, {http.Client? httpClient})
-    : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
+  ErpNextClient(String baseUrl, {http.Client? httpClient, String? sid})
+    : _sid = sid,
+      baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
       _http = httpClient ?? http.Client();
 
   final String baseUrl;
   final http.Client _http;
   String? _sid;
+
+  /// The server's session, kept on the phone so closing the app does not log out.
+  String? get sid => _sid;
 
   Map<String, String> get _headers => {
     'Accept': 'application/json',

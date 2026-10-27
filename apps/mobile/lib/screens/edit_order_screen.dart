@@ -37,7 +37,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   @override
   void initState() {
     super.initState();
-    _reason.addListener(() => setState(() {}));
+    _reason.addListener(() {
+      if (_error != null) setState(() => _error = null);
+    });
   }
 
   @override
@@ -77,6 +79,10 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
 
   Future<void> _send() async {
     final s = S.of(context);
+    if (_reason.text.trim().isEmpty) {
+      setState(() => _error = s.t('Write a reason first'));
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -165,10 +171,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
               const SizedBox(height: 16),
               FilledButton(
                 key: const Key('send-edit'),
-                onPressed:
-                    _busy || _lines.isEmpty || _reason.text.trim().isEmpty
-                    ? null
-                    : _send,
+                onPressed: _busy || _lines.isEmpty ? null : _send,
                 child: _busy
                     ? const CircularProgressIndicator()
                     : Text(s.t('Send to the owner')),

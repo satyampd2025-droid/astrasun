@@ -80,10 +80,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('qty-ATTA-50KG')), findsOneWidget);
     // A reason is needed before it can be sent
-    expect(
-      tester.widget<FilledButton>(find.byKey(const Key('send-edit'))).onPressed,
-      isNull,
-    );
+    await tester.tap(find.byKey(const Key('send-edit')));
+    await tester.pumpAndSettle();
+    expect(find.text('Write a reason first'), findsOneWidget);
     await tester.enterText(
       find.descendant(
         of: find.byKey(const Key('edit-reason')),
