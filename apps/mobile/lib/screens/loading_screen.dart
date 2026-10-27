@@ -458,18 +458,20 @@ class _BatchDialog extends StatefulWidget {
 class _BatchDialogState extends State<_BatchDialog> {
   final Map<String, List<BatchStock>> _stock = {};
   final Map<String, String> _chosen = {};
+  bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    for (final i in widget.task.items) {
-      widget
-          .load(i.itemCode)
-          .then((b) {
-            if (mounted) setState(() => _stock[i.itemCode] = b);
-          })
-          .catchError((_) {});
-    }
+    Future.wait(
+      widget.task.items.map(
+        (i) => widget.load(i.itemCode).then((b) {
+          if (mounted) setState(() => _stock[i.itemCode] = b);
+        }),
+      ),
+    ).then<void>((_) {}, onError: (_) {}).whenComplete(() {
+      if (mounted) setState(() => _loaded = true);
+    });
   }
 
   @override
@@ -481,6 +483,13 @@ class _BatchDialogState extends State<_BatchDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_loaded && _stock.values.every((b) => b.isEmpty))
+              Text(
+                s.t(
+                  'No bags of this item are in stock. Add the stock first, then tap Truck left again.',
+                ),
+                key: const Key('left-batch-empty'),
+              ),
             for (final i in widget.task.items)
               if ((_stock[i.itemCode] ?? []).isNotEmpty)
                 DropdownButtonFormField<String>(
