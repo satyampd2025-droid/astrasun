@@ -142,6 +142,7 @@ class TestMVPAcceptance(MillFixture):
 		self.assertEqual(
 			frappe.db.get_value("Sales Invoice", view["invoice"], "outstanding_amount"), invoice_total
 		)
+		frappe.set_user(accounts)
 		owed = {d["customer"]: d["due"] for d in payments.dues()}
 		self.assertEqual(owed[customer], invoice_total)
 		payments.collect(customer, 10000, "Cash")
