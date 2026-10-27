@@ -14,7 +14,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime
 
-from astrasun import payments
+from astrasun import alerts, payments
 
 # Take money against an order. A rep only on their own orders, a driver only on orders on their vehicle.
 FIELD_ROLES = ("Mill Sales", "Mill Driver")
@@ -160,6 +160,7 @@ def collect(sales_order, amount, mode="Cash", reference=None):
 	doc.insert()
 	if _roles().intersection(SETTLER_ROLES):
 		_settle(doc)
+	alerts.money_collected(sales_order, so.customer_name, amount)
 	return {**_row(doc), **money(sales_order)}
 
 
