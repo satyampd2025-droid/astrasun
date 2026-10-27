@@ -102,8 +102,10 @@ def _check(doc):
 
 
 def _warehouse(item_code, company):
-	"""Where this item is kept, from the item's defaults for the company."""
-	return frappe.db.get_value("Item Default", {"parent": item_code, "company": company}, "default_warehouse")
+	"""Where this item is kept: the item's default for the company, else the company's Finished Goods warehouse."""
+	return frappe.db.get_value(
+		"Item Default", {"parent": item_code, "company": company}, "default_warehouse"
+	) or frappe.db.get_value("Warehouse", {"company": company, "warehouse_name": "Finished Goods"})
 
 
 def create_order_doc(customer, items, delivery_date=None, remarks=None):
@@ -636,7 +638,8 @@ def catalog():
 	)
 	items = frappe.get_all(
 		"Item",
-		filters={"item_group": "Finished Goods", "disabled": 0},
+		# Everything marked Allow sales, whatever its group; wheat and empty bags are never sold
+		filters={"is_sales_item": 1, "disabled": 0, "item_group": ["not in", ["Wheat", "Packaging"]]},
 		fields=["item_code", "item_name"],
 		order_by="item_name asc",
 	)
