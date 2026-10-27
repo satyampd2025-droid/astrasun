@@ -216,6 +216,8 @@ def dispatch(name, batches=None):
 		dn.astrasun_loading_status = DELIVERED
 		dn.astrasun_delivered_at = now_datetime()
 		dn.astrasun_received_by = dn.astrasun_received_by or frappe.session.user
+		for row in dn.items:
+			row.allow_zero_valuation_rate = 1  # no stock is tracked yet, so there may be no cost to book
 		dn.save()
 		dn.submit()
 	return _view(dn)
