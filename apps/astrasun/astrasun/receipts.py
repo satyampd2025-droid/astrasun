@@ -139,6 +139,8 @@ def collect(sales_order, amount, mode="Cash", reference=None):
 	invoices = order_invoices(sales_order)
 	if not invoices:
 		frappe.throw(_("There is no bill for this order yet"), CollectionError)
+	if not frappe.db.exists("Delivery Note Item", {"against_sales_order": sales_order, "docstatus": 1}):
+		frappe.throw(_("The truck has not left yet. Collect once the order is delivered."), CollectionError)
 	left = money(sales_order, invoices)["remaining"]
 	if amount > left:
 		frappe.throw(_("More than is left to pay on this order ({0})").format(left), CollectionError)
@@ -271,7 +273,7 @@ def my_collections():
 		if not invoices:
 			continue
 		m = money(name, invoices)
-		if m["remaining"] > 0 or m["with_collector"] > 0:
+		if m["remaining"] > 0:  # fully collected: it leaves this list; the cash shows under "holding"
 			so = frappe.db.get_value("Sales Order", name, ["customer_name", "delivery_date"], as_dict=True)
 			orders.append({"sales_order": name, "customer_name": so.customer_name, **m})
 	return {

@@ -71,6 +71,17 @@ def order_decided(doc, decision):
 	)
 
 
+def edit_asked(doc, reason):
+	"""A rep or the warehouse asked to change an approved order: the owner and managers hear of it."""
+	notify(
+		users_with_role(OWNER_ROLES),
+		f"Change asked on {doc.name} ({doc.customer_name}): {reason}",
+		"Sales Order",
+		doc.name,
+		skip=frappe.session.user,
+	)
+
+
 def money_collected(sales_order, customer_name, amount):
 	"""Money was collected on an order: the owner and managers hear of it."""
 	notify(

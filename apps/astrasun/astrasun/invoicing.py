@@ -9,7 +9,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import flt, nowdate
+from frappe.utils import flt, now_datetime, nowdate
 from frappe.utils.pdf import get_pdf
 
 from astrasun import audit
@@ -19,6 +19,7 @@ from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
 DISPATCH_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 DISPATCHED = "Dispatched"
+DELIVERED = "Delivered"
 # The mill prints its bills on A5
 PAGE = {
 	"page-size": "A5",
@@ -184,7 +185,10 @@ def dispatch(name):
 			InvoicingError,
 		)
 	with _as_system():
-		dn.astrasun_loading_status = DISPATCHED
+		# The truck leaving is the delivery: there is no driver step in the three-person flow
+		dn.astrasun_loading_status = DELIVERED
+		dn.astrasun_delivered_at = now_datetime()
+		dn.astrasun_received_by = dn.astrasun_received_by or frappe.session.user
 		dn.save()
 		dn.submit()
 	return _view(dn)

@@ -30,7 +30,7 @@ class TestInvoicing(MillFixture):
 		frappe.set_user(self.dispatcher)
 		self.assertIn(dn, [t["name"] for t in invoicing.to_dispatch()])
 		out = invoicing.dispatch(dn)
-		self.assertEqual(out["status"], "Dispatched")
+		self.assertEqual(out["status"], "Delivered")
 		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Sales Invoice", view["invoice"], "docstatus"), 1)
 
@@ -52,7 +52,7 @@ class TestInvoicing(MillFixture):
 		view = invoicing.invoice(dn)
 		self.assertTrue(view["invoice"])
 		self.assertNotIn("eway_bill_needed", view)
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")  # the warehouse sends it too
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")  # the warehouse sends it too
 
 	def test_cannot_invoice_twice_and_roles_enforced(self):
 		_, dn = self._loaded()
@@ -93,7 +93,7 @@ class TestInvoicing(MillFixture):
 		invoicing.invoice(dn)
 		frappe.set_user(self.dispatcher)
 		self._real_server()
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")
 		rows = frappe.get_all(
 			"Delivery Note Item", filters={"parent": dn}, fields=["qty", "serial_and_batch_bundle"]
 		)

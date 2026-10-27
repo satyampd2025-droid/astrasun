@@ -54,6 +54,15 @@ class TestEditOrder(MillFixture):
 		self.assertEqual(by_item, {ITEM: 4, OTHER: 3})
 		self.assertEqual(approved["total"], 4 * 1500 + 3 * 400)
 
+	def test_the_owner_edits_an_approved_order_and_it_applies_at_once(self):
+		name = self._approved(10)
+		done = self._edit(self.owner, name, [{"item_code": ITEM, "qty": 7}], "Shop asked the owner")
+		self.assertEqual(done["name"], f"{name}-1")
+		self.assertEqual(done["stage"], "Approved")
+		self.assertEqual([i["qty"] for i in done["items"]], [7])
+		self.assertEqual(done["submitted_by"], self.rep)
+		self.assertIsNone(done["edit"])
+
 	def test_an_item_can_be_taken_off(self):
 		name = self._approved(10)
 		self._edit(
