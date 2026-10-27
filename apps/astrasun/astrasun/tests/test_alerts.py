@@ -1,6 +1,6 @@
 import frappe
 
-from astrasun import alerts, delivery, orders, receipts
+from astrasun import alerts, orders, receipts
 from astrasun.tests.helpers import MillFixture
 
 
@@ -39,8 +39,6 @@ class TestAlerts(MillFixture):
 	def test_the_owner_hears_when_money_is_collected(self):
 		customer, dn, invoice = self.make_dispatched(qty=10)
 		order = frappe.db.get_value("Delivery Note Item", {"parent": dn}, "against_sales_order")
-		frappe.set_user(self.driver)
-		delivery.deliver(dn, "Ramesh Sharma")
 		frappe.db.delete("Notification Log", {"type": "Alert"})
 		frappe.set_user(self.rep)
 		receipts.collect(order, 5000, "Cash")

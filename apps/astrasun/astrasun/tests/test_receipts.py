@@ -1,6 +1,6 @@
 import frappe
 
-from astrasun import delivery, orders, receipts
+from astrasun import orders, receipts
 from astrasun.tests.helpers import MillFixture, _user
 
 
@@ -17,8 +17,6 @@ class TestReceipts(MillFixture):
 		"""An order the rep booked, billed, sent out and delivered by the driver. Returns (order, invoice, total)."""
 		customer, dn, invoice = self.make_dispatched(qty=qty)
 		order = frappe.db.get_value("Delivery Note Item", {"parent": dn}, "against_sales_order")
-		frappe.set_user(self.driver)
-		delivery.deliver(dn, "Ramesh Sharma")
 		total = frappe.db.get_value("Sales Invoice", invoice, "grand_total")
 		return order, invoice, total
 
@@ -92,6 +90,31 @@ class TestReceipts(MillFixture):
 		frappe.set_user(self.rep)
 		# Earlier tests leave their own orders behind, so look for this one among the rep's
 		self.assertIn(order, [o["sales_order"] for o in receipts.my_collections()["orders"]])
+
+	def test_an_order_stays_in_my_collections_until_all_of_it_is_collected(self):
+		order, _inv, total = self._billed_order()
+		frappe.set_user(self.rep)
+		receipts.collect(order, 4000, "Cash")
+		mine = {o["sales_order"]: o for o in receipts.my_collections()["orders"]}
+		self.assertEqual(mine[order]["remaining"], total - 4000)
+		receipts.collect(order, total - 4000, "Cash")
+		self.assertNotIn(order, [o["sales_order"] for o in receipts.my_collections()["orders"]])
+		self.assertEqual(receipts.my_collections()["holding"], total)  # the cash is still with the rep
+
+	def test_no_collection_before_the_truck_has_left(self):
+		from astrasun import invoicing, loading
+
+		loader = _user("loader@example.com", "Mill Warehouse")
+		order = self._order(self._customer(limit=10000000))
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(loader)
+		task = loading.start(order["name"])
+		loading.mark_loaded(task["name"], "MP09AB1234", [{"item_code": "ATTA-50KG", "qty": 10}])
+		invoicing.invoice(task["name"])  # billed, truck still here
+		frappe.set_user(self.rep)
+		with self.assertRaises(receipts.CollectionError):
+			receipts.collect(order["name"], 100)
 
 	def test_a_driver_collects_on_orders_on_their_vehicle(self):
 		order, _inv, _total = self._billed_order()

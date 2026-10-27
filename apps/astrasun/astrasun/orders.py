@@ -340,9 +340,9 @@ def can_edit(doc):
 
 @frappe.whitelist()
 def edit_order(name, items, reason, delivery_date=None):
-	"""The rep or the warehouse changes an order: items, bags and date.
+	"""The rep, the warehouse or (on an approved order) the owner changes an order: items, bags and date.
 
-	Every edit goes to the owner. Before the owner has approved the order it simply goes back to
+	A rep's or warehouse's edit goes to the owner; the owner's own edit applies at once. Before the owner has approved the order it simply goes back to
 	Waiting for approval; once approved the old order stands until the owner approves the edit.
 	Nothing can be edited after a truck has left.
 	"""
@@ -350,7 +350,8 @@ def edit_order(name, items, reason, delivery_date=None):
 	doc = frappe.get_doc("Sales Order", name)
 	user = frappe.session.user
 	rep = "Mill Sales" in roles and user in (doc.astrasun_submitted_by, doc.owner)
-	if not (rep or roles.intersection(EDITOR_ROLES)):
+	boss = bool(roles.intersection(APPROVER_ROLES)) and doc.docstatus == 1
+	if not (rep or boss or roles.intersection(EDITOR_ROLES)):
 		frappe.throw(_("You cannot edit this order"), frappe.PermissionError)
 	reason = (reason or "").strip()
 	if not reason:
@@ -406,7 +407,24 @@ def edit_order(name, items, reason, delivery_date=None):
 			doc.save()
 		audit.log(doc, "Approval", f"Order edited before approval: {reason}")
 		doc.reload()
+		alerts.order_placed(doc)
 		return summary(doc)
+	if boss:
+		# The owner changes an approved order: it takes effect at once, nobody else needs to approve it
+		with _as_system():
+			doc.db_set(
+				{
+					"astrasun_edit_json": json.dumps({"items": list(wanted.values()), "delivery_date": date}),
+					"astrasun_edit_note": reason,
+					"astrasun_edit_by": user,
+				},
+				update_modified=False,
+			)
+		doc.reload()
+		done = _approve_edit(doc, f"Changed by {user}")
+		new = frappe.get_doc("Sales Order", done["name"])
+		alerts.order_decided(new, "changed by the owner")
+		return done
 	with _as_system():
 		doc.db_set(
 			{
@@ -418,6 +436,7 @@ def edit_order(name, items, reason, delivery_date=None):
 		)
 	audit.log(doc, "Approval", f"Edit asked: {reason}")
 	doc.reload()
+	alerts.edit_asked(doc, reason)
 	return summary(doc)
 
 

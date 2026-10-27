@@ -70,7 +70,7 @@ class TestLoadChanges(MillFixture):
 		new = invoicing.invoice(dn)
 		self.assertNotEqual(new["invoice"], old)
 		self.assertEqual(frappe.db.get_value("Sales Invoice Item", {"parent": new["invoice"]}, "qty"), 8)
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")
 
 	def test_turned_down_change_leaves_load_and_bill_as_they_were(self):
 		_, dn, old = self._billed(qty=10)
@@ -81,7 +81,7 @@ class TestLoadChanges(MillFixture):
 		self.assertEqual(frappe.db.get_value("Sales Invoice", old, "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "astrasun_invoice"), old)
 		frappe.set_user(self.loader)
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")
 
 	def test_change_rules(self):
 		_, dn, _inv = self._billed(qty=10)
