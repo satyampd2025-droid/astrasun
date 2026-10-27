@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../home/role_tasks.dart';
 import '../strings.dart';
 import '../widgets/language_switch.dart';
+import 'alerts_screen.dart';
 import 'approvals_screen.dart';
 import 'coming_soon_screen.dart';
 import 'dashboard_screen.dart';
@@ -41,6 +42,7 @@ class HomeScreen extends StatelessWidget {
         toolbarHeight: 72,
         title: Text(s.t('Namaste, {0}', [state.me!.fullName])),
         actions: [
+          BellButton(client: client),
           LanguageSwitch(state: state),
           IconButton(
             key: const Key('logout'),

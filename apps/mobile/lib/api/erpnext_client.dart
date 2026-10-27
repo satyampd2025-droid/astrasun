@@ -429,6 +429,21 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
+  /// The bell: newest first.
+  Future<List<AppAlert>> alerts() async => [
+    for (final a
+        in _message(await _post('astrasun.alerts.my_alerts', {})) as List)
+      AppAlert.fromJson(a as Map<String, dynamic>),
+  ];
+
+  Future<int> unreadAlerts() async =>
+      (_message(await _post('astrasun.alerts.unread_count', {})) as num)
+          .toInt();
+
+  Future<void> markAlertsRead() async {
+    _message(await _post('astrasun.alerts.mark_read', {}));
+  }
+
   Future<MyCollections> myCollections() async => MyCollections.fromJson(
     _message(await _post('astrasun.receipts.my_collections', {}))
         as Map<String, dynamic>,

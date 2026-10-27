@@ -355,6 +355,31 @@ class LoadingTask {
 }
 
 /// A truck the mill loads, with the driver who goes with it.
+/// One line of the bell: what happened and the order it is about.
+class AppAlert {
+  const AppAlert({
+    required this.id,
+    required this.subject,
+    required this.at,
+    this.order,
+    this.read = false,
+  });
+
+  factory AppAlert.fromJson(Map<String, dynamic> j) => AppAlert(
+    id: j['id'] as String,
+    subject: j['subject'] as String,
+    order: j['order'] as String?,
+    read: (j['read'] as bool?) ?? false,
+    at: DateTime.parse((j['at'] as String).replaceFirst(' ', 'T')),
+  );
+
+  final String id;
+  final String subject;
+  final String? order;
+  final bool read;
+  final DateTime at;
+}
+
 /// One batch of a bag item with bags in stock; the warehouse picks which one goes on the truck.
 class BatchStock {
   const BatchStock({required this.batchNo, required this.qty});

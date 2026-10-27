@@ -648,6 +648,35 @@ class DemoClient extends ErpNextClient {
     return c;
   }
 
+  final List<AppAlert> _alerts = [
+    AppAlert(
+      id: 'A1',
+      subject: 'New order SAL-ORD-0001 from Sharma Kirana Store: Rs 15,000',
+      order: 'SAL-ORD-0001',
+      at: DateTime(2026, 10, 3, 9, 30),
+    ),
+  ];
+
+  @override
+  Future<List<AppAlert>> alerts() async => List.of(_alerts);
+
+  @override
+  Future<int> unreadAlerts() async => _alerts.where((a) => !a.read).length;
+
+  @override
+  Future<void> markAlertsRead() async {
+    for (var i = 0; i < _alerts.length; i++) {
+      final a = _alerts[i];
+      _alerts[i] = AppAlert(
+        id: a.id,
+        subject: a.subject,
+        order: a.order,
+        at: a.at,
+        read: true,
+      );
+    }
+  }
+
   @override
   Future<MyCollections> myCollections() async {
     final held = [
@@ -657,7 +686,7 @@ class DemoClient extends ErpNextClient {
     final orders = [
       for (final t in _loading)
         if (t.invoice != null) _moneyOn(t.salesOrder, t.customerName),
-    ].where((o) => o.remaining > 0 || o.withCollector > 0).toList();
+    ].where((o) => o.remaining > 0).toList();
     return MyCollections(
       holding: held.fold(0.0, (a, c) => a + c.amount),
       collections: held,
