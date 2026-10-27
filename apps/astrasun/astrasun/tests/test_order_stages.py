@@ -102,7 +102,9 @@ class TestOrderStages(MillFixture):
 		)
 		invoicing.dispatch(task["name"])
 
+		# The truck leaving is the delivery: nothing waits on the driver any more
 		frappe.set_user(self.driver)
+		self.assertEqual([t for t in delivery.my_deliveries() if t["name"] == task["name"]], [])
 		self.assertEqual(
-			[t["stage"] for t in delivery.my_deliveries() if t["name"] == task["name"]], ["On the way"]
+			frappe.db.get_value("Delivery Note", task["name"], "astrasun_loading_status"), "Delivered"
 		)
