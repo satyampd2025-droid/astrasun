@@ -20,7 +20,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
 
-from astrasun import audit, receipts, stages
+from astrasun import alerts, audit, receipts, stages
 
 APPROVER_ROLES = ("Mill Owner", "Mill Manager")
 OWNER_ROLE = "Mill Owner"
@@ -159,6 +159,7 @@ def submit_for_approval(name):
 	doc.astrasun_submitted_by = frappe.session.user
 	doc.astrasun_approval_note = None
 	doc.save()
+	alerts.order_placed(doc)
 	return summary(doc)
 
 
@@ -204,6 +205,7 @@ def approve(name, note=None):
 		"Approval",
 		note or ("Approved over credit limit" if doc.astrasun_credit_breach else "Approved"),
 	)
+	alerts.order_decided(doc, "approved")
 	return summary(doc)
 
 
@@ -229,6 +231,7 @@ def _decide(name, status, reason):
 	doc.astrasun_approval_note = reason
 	doc.save()
 	audit.log(doc, "Approval", f"{status}: {reason}")
+	alerts.order_decided(doc, status.lower())
 	return summary(doc)
 
 
@@ -370,8 +373,10 @@ def edit_order(name, items, reason, delivery_date=None):
 		old = next((r for r in doc.items if r.item_code == code), None)
 		rate = row.get("rate")
 		if rate is None:
-			rate = old.rate if old else frappe.db.get_value(
-				"Item Price", {"item_code": code, "selling": 1}, "price_list_rate"
+			rate = (
+				old.rate
+				if old
+				else frappe.db.get_value("Item Price", {"item_code": code, "selling": 1}, "price_list_rate")
 			)
 		qty += wanted[code]["qty"] if code in wanted else 0
 		wanted[code] = {"item_code": code, "qty": qty, "rate": flt(rate)}
@@ -457,7 +462,10 @@ def _facts(names):
 		)
 		for dn in trucks:
 			status[dn.name] = dn.astrasun_loading_status
-			if dn.astrasun_change_status == "Requested" and dn.astrasun_loading_status in ("Loading", "Loaded"):
+			if dn.astrasun_change_status == "Requested" and dn.astrasun_loading_status in (
+				"Loading",
+				"Loaded",
+			):
 				asked.add(dn.name)
 		for row in notes:
 			if row.parent in status:
