@@ -67,12 +67,17 @@ class TestInvoicing(MillFixture):
 		with self.assertRaises(frappe.PermissionError):
 			invoicing.dispatch(dn)  # accounts bill, they do not send trucks
 
+	def _item_flags(self, flags):
+		frappe.db.set_value("Item", ITEM, flags)
+		frappe.clear_document_cache("Item", ITEM)  # ERPNext reads the item through its cache
+
 	def _track_batches(self):
 		"""Finished bags are not tracked by batch by default; switch it on for the batch tests."""
 		old = frappe.db.get_value("Item", ITEM, ["has_batch_no", "create_new_batch"], as_dict=True)
-		self.addCleanup(frappe.db.set_value, "Item", ITEM, dict(old))
-		frappe.db.set_value("Item", ITEM, {"has_batch_no": 1, "create_new_batch": 1})
-		frappe.db.set_value("Item", ITEM, "batch_number_series", "PK-TEST-.YYYY.-.#####")
+		self.addCleanup(self._item_flags, dict(old))
+		self._item_flags(
+			{"has_batch_no": 1, "create_new_batch": 1, "batch_number_series": "PK-TEST-.YYYY.-.#####"}
+		)
 
 	def _real_server(self):
 		"""ERPNext skips its batch check while testing; switch test mode off to see a real server."""
