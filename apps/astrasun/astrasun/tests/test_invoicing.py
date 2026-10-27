@@ -94,7 +94,7 @@ class TestInvoicing(MillFixture):
 		task = loading.start(order["name"])
 		listed = loading.batches(ITEM)
 		self.assertTrue(listed["tracked"])
-		batch = listed["batches"][0]
+		batch = max(listed["batches"], key=lambda b: b["qty"])  # earlier runs may leave small batches behind
 		self.assertGreaterEqual(batch["qty"], 20)
 		dn = loading.mark_loaded(
 			task["name"], "MP09AB1234", [{"item_code": ITEM, "qty": 4, "batch_no": batch["batch_no"]}]
@@ -178,7 +178,7 @@ class TestInvoicing(MillFixture):
 		invoicing.invoice(dn)
 		frappe.set_user(self.dispatcher)
 		self._real_server()
-		batch = loading.batches(ITEM)["batches"][0]["batch_no"]
+		batch = max(loading.batches(ITEM)["batches"], key=lambda b: b["qty"])["batch_no"]
 		with self.assertRaises(invoicing.InvoicingError):
 			invoicing.dispatch(dn, {ITEM: "NOPE"})
 		self.assertEqual(invoicing.dispatch(dn, {ITEM: batch})["status"], "Delivered")
