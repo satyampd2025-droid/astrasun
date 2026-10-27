@@ -571,8 +571,14 @@ class DemoClient extends ErpNextClient {
 
   @override
   Future<LoadingTask> dispatchTruck(LoadingTask task) async {
-    _follow(task.salesOrder, 5);
-    return _setTask(task.id, (t) => t.copyWith(status: 'Dispatched'));
+    // The truck leaving is the delivery: there is no driver step
+    _follow(
+      task.salesOrder,
+      6,
+      label: 'Delivered, payment pending',
+      tone: 'warn',
+    );
+    return _setTask(task.id, (t) => t.copyWith(status: 'Delivered'));
   }
 
   @override

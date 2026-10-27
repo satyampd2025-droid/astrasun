@@ -55,7 +55,8 @@ void main() {
     await tester.tap(find.byKey(const Key('left-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('print-SAL-ORD-0000')), findsNothing);
-    expect((await client.myDeliveries()).single.status, 'Dispatched');
+    // The truck leaving is the delivery: nothing is left for a driver
+    expect(await client.myDeliveries(), isEmpty);
   });
 
   testWidgets('a change after printing goes to the owner, then a new bill', (

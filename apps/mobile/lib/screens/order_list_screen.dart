@@ -27,8 +27,12 @@ class AllOrdersScreen extends StatelessWidget {
   final ErpNextClient client;
 
   @override
-  Widget build(BuildContext context) =>
-      _OrderListScreen(title: 'All orders', load: client.allOrders);
+  Widget build(BuildContext context) => _OrderListScreen(
+    title: 'All orders',
+    load: client.allOrders,
+    client: client,
+    ownerEdits: true,
+  );
 }
 
 class _OrderListScreen extends StatefulWidget {
@@ -36,12 +40,16 @@ class _OrderListScreen extends StatefulWidget {
     required this.title,
     required this.load,
     this.client,
+    this.ownerEdits = false,
   });
   final String title;
   final Future<List<Order>> Function() load;
 
   /// With a client, an order that can still be edited has an Edit order button.
   final ErpNextClient? client;
+
+  /// The owner changes an approved order at once: the Edit order button shows on those only.
+  final bool ownerEdits;
 
   @override
   State<_OrderListScreen> createState() => _OrderListScreenState();
@@ -65,7 +73,17 @@ class _OrderListScreenState extends State<_OrderListScreen> {
     );
     if (done != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(S.of(context).t('Change sent to the owner'))),
+        SnackBar(
+          content: Text(
+            S
+                .of(context)
+                .t(
+                  widget.ownerEdits
+                      ? 'Order changed'
+                      : 'Change sent to the owner',
+                ),
+          ),
+        ),
       );
     }
     await _refresh();
@@ -87,7 +105,10 @@ class _OrderListScreenState extends State<_OrderListScreen> {
           for (final o in orders)
             OrderCard(
               order: o,
-              actions: widget.client != null && o.canEdit
+              actions:
+                  widget.client != null &&
+                      o.canEdit &&
+                      (!widget.ownerEdits || o.status == 'Approved')
                   ? OutlinedButton.icon(
                       key: Key('edit-order-${o.name}'),
                       icon: const Icon(Icons.edit_outlined),
