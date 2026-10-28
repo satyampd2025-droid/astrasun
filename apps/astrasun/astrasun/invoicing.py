@@ -5,16 +5,30 @@ Print bill. Only then can the truck leave: dispatch submits the Delivery Note,
 which moves the stock out. The e-way bill is not part of the app yet (v2).
 """
 
+import json
+import re
+
 import frappe
 from frappe import _
-from frappe.utils import flt, nowdate
+from frappe.utils import flt, now_datetime, nowdate
+from frappe.utils.pdf import get_pdf
 
 from astrasun import audit
+from astrasun.setup.print_format import NAME as BILL_FORMAT
 from astrasun.loading import CHANGE_REQUESTED, LOADED, _as_system, _task
 
 BILLER_ROLES = ("Mill Warehouse", "Mill Accounts", "Mill Manager", "Mill Owner")
 DISPATCH_ROLES = ("Mill Warehouse", "Mill Dispatch", "Mill Manager", "Mill Owner")
 DISPATCHED = "Dispatched"
+DELIVERED = "Delivered"
+# The mill prints its bills on A5
+PAGE = {
+	"page-size": "A5",
+	"margin-top": "7mm",
+	"margin-bottom": "7mm",
+	"margin-left": "7mm",
+	"margin-right": "7mm",
+}
 
 
 class InvoicingError(frappe.ValidationError):
@@ -68,6 +82,12 @@ def to_dispatch():
 	return [_view(frappe.get_doc("Delivery Note", n)) for n in names]
 
 
+def _edit_waiting(dn):
+	return bool(
+		dn.items and frappe.db.get_value("Sales Order", dn.items[0].against_sales_order, "astrasun_edit_json")
+	)
+
+
 @frappe.whitelist()
 def invoice(name):
 	"""Print bill: bill a loaded truck from the bags actually loaded."""
@@ -79,10 +99,12 @@ def invoice(name):
 		frappe.throw(_("Only a loaded truck can be invoiced"), InvoicingError)
 	if dn.astrasun_invoice:
 		frappe.throw(_("This truck is already invoiced"), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
 
-	loaded = {r.so_detail: flt(r.qty) for r in dn.items}
+	loaded = {}
+	for r in dn.items:
+		loaded[r.so_detail] = loaded.get(r.so_detail, 0) + flt(r.qty)
 	sales_order = dn.items[0].against_sales_order
 	with _as_system():
 		si = make_sales_invoice(sales_order)
@@ -100,6 +122,26 @@ def invoice(name):
 	return _view(dn)
 
 
+def _pdf_without_what_it_cannot_fetch(html):
+	"""The PDF tool runs inside the server and fetches pictures and styles by their web address. When
+	that fails (a logo that is gone, a server it cannot reach) the whole bill fails, so it tries again
+	without the pictures, then without the linked styles and scripts too."""
+	steps = (
+		None,
+		(r"<img\b[^>]*>",),
+		(r"<img\b[^>]*>", r"<link\b[^>]*>", r"<script\b[^>]*\bsrc=[^>]*>\s*</script>"),
+	)
+	for patterns in steps:
+		body = html
+		for pattern in patterns or ():
+			body = re.sub(pattern, "", body, flags=re.I)
+		try:
+			return get_pdf(body, PAGE)
+		except (OSError, frappe.ValidationError):
+			if patterns is steps[-1]:
+				raise
+
+
 @frappe.whitelist()
 def bill_pdf(name):
 	"""The truck's bill as a PDF, for the phone to print."""
@@ -108,25 +150,74 @@ def bill_pdf(name):
 	if not invoice_name:
 		frappe.throw(_("This truck has no bill yet"), InvoicingError)
 	with _as_system():
-		pdf = frappe.get_print("Sales Invoice", invoice_name, as_pdf=True)
+		html = frappe.get_print("Sales Invoice", invoice_name, print_format=BILL_FORMAT, no_letterhead=1)
+		pdf = _pdf_without_what_it_cannot_fetch(html)
 	frappe.local.response.filename = f"{invoice_name}.pdf"
 	frappe.local.response.filecontent = pdf
 	frappe.local.response.type = "pdf"
 
 
+def _needs_batch(dn):
+	"""The bag items on this truck that still have no batch chosen."""
+	return [
+		r.item_code
+		for r in dn.items
+		if not r.batch_no
+		and not r.serial_and_batch_bundle
+		and frappe.db.get_value("Item", r.item_code, "has_batch_no")
+	]
+
+
+def _pick_batches(dn, chosen):
+	"""Put the chosen batch on the rows that have none, checking the batch has the bags."""
+	from astrasun.loading import _batch_stock
+
+	wanted = {}
+	for r in dn.items:
+		batch = (chosen.get(r.item_code) or "").strip()
+		if r.batch_no or r.serial_and_batch_bundle or not batch:
+			continue
+		if frappe.db.get_value("Batch", batch, "item") != r.item_code:
+			frappe.throw(_("Batch {0} is not a batch of {1}").format(batch, r.item_code), InvoicingError)
+		wanted[(r.item_code, batch)] = wanted.get((r.item_code, batch), 0) + flt(r.qty)
+		r.batch_no = batch
+		r.use_serial_batch_fields = 1
+		if wanted[(r.item_code, batch)] > _batch_stock(r.item_code, r.warehouse, batch):
+			frappe.throw(
+				_("Batch {0} does not have {1} bags").format(batch, wanted[(r.item_code, batch)]),
+				InvoicingError,
+			)
+
+
 @frappe.whitelist()
-def dispatch(name):
-	"""Let the truck leave. Needs an invoice."""
+def dispatch(name, batches=None):
+	"""Let the truck leave. Needs an invoice.
+
+	`batches` ({item_code: batch_no}) fills in the batch of bag items the warehouse did not pick while
+	loading, so a truck loaded before batches were asked for can still leave."""
 	_require(DISPATCH_ROLES, "Only dispatch staff can send trucks")
 	dn = frappe.get_doc("Delivery Note", name)
 	if dn.docstatus != 0 or dn.astrasun_loading_status != LOADED:
 		frappe.throw(_("This truck is not ready to leave"), InvoicingError)
 	if not dn.astrasun_invoice:
 		frappe.throw(_("Invoice first. The truck cannot leave without one."), InvoicingError)
-	if dn.astrasun_change_status == CHANGE_REQUESTED:
+	if dn.astrasun_change_status == CHANGE_REQUESTED or _edit_waiting(dn):
 		frappe.throw(_("A change to this load is waiting for the owner"), InvoicingError)
+	if batches:
+		_pick_batches(dn, json.loads(batches) if isinstance(batches, str) else batches)
+	missing = [] if frappe.flags.in_test else _needs_batch(dn)  # ERPNext skips its own check while testing
+	if missing:
+		frappe.throw(
+			_("Choose the batch for {0} before the truck leaves").format(", ".join(sorted(set(missing)))),
+			InvoicingError,
+		)
 	with _as_system():
-		dn.astrasun_loading_status = DISPATCHED
+		# The truck leaving is the delivery: there is no driver step in the three-person flow
+		dn.astrasun_loading_status = DELIVERED
+		dn.astrasun_delivered_at = now_datetime()
+		dn.astrasun_received_by = dn.astrasun_received_by or frappe.session.user
+		for row in dn.items:
+			row.allow_zero_valuation_rate = 1  # no stock is tracked yet, so there may be no cost to book
 		dn.save()
 		dn.submit()
 	return _view(dn)

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../strings.dart';
@@ -76,8 +78,42 @@ class PullToReload<T> extends StatefulWidget {
   State<PullToReload<T>> createState() => _PullToReloadState<T>();
 }
 
-class _PullToReloadState<T> extends State<PullToReload<T>> {
+/// How often an open list asks the server for news, so the owner sees a new
+/// order without pulling down.
+const pollEvery = Duration(seconds: 15);
+
+class _PullToReloadState<T> extends State<PullToReload<T>>
+    with WidgetsBindingObserver {
   bool _pulling = false;
+  bool _visible = true;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _poll = Timer.periodic(pollEvery, (_) => _quietly());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _visible = state == AppLifecycleState.resumed;
+    if (_visible) _quietly(); // back in the app: catch up at once
+  }
+
+  /// Loads again behind the content, only while this screen is the one on top.
+  void _quietly() {
+    if (!mounted || !_visible || _pulling) return;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    _pull();
+  }
 
   Future<void> _pull() async {
     setState(() => _pulling = true);

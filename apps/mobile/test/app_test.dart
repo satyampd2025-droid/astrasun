@@ -57,8 +57,9 @@ Future<AppState> startApp(
   SharedPreferences.setMockInitialValues({});
   final state = AppState(
     fixedServer: fixedServer,
-    clientFactory: (url) => ErpNextClient(
+    clientFactory: (url, {sid}) => ErpNextClient(
       url,
+      sid: sid,
       httpClient: fakeErpNext(roles, languageCalls: languageCalls),
     ),
   );
@@ -76,6 +77,36 @@ Future<void> logIn(WidgetTester tester, {String password = 'secret'}) async {
 }
 
 void main() {
+  test(
+    'closing the app does not log out: the saved session is resumed',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      ErpNextClient factory(String url, {String? sid}) =>
+          ErpNextClient(url, sid: sid, httpClient: fakeErpNext(['Mill Sales']));
+      final first = AppState(
+        fixedServer: 'https://mill.example.com',
+        clientFactory: factory,
+      );
+      await first.load();
+      await first.login('https://mill.example.com', 'ramesh', 'secret');
+
+      final reopened = AppState(
+        fixedServer: 'https://mill.example.com',
+        clientFactory: factory,
+      );
+      await reopened.load();
+      expect(reopened.loggedIn, isTrue);
+
+      await reopened.logout();
+      final again = AppState(
+        fixedServer: 'https://mill.example.com',
+        clientFactory: factory,
+      );
+      await again.load();
+      expect(again.loggedIn, isFalse);
+    },
+  );
+
   testWidgets('opens in Hindi and switches to English', (tester) async {
     await startApp(tester, ['Mill Sales']);
     expect(find.text('लॉग इन करें'), findsOneWidget);

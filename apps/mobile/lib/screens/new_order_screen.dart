@@ -5,6 +5,7 @@ import '../api/models.dart';
 import '../strings.dart';
 import '../widgets/load_error.dart';
 import '../widgets/order_card.dart';
+import '../widgets/order_line_tile.dart';
 import '../widgets/voice_text_field.dart';
 
 /// Sales rep: pick customer, pick bags, set quantity, send for approval.
@@ -29,6 +30,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Future<void> _send() async {
     final s = S.of(context);
+    if (_lines.any((l) => l.rate <= 0)) {
+      setState(() => _error = s.t('Enter the price for every item'));
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -57,7 +62,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               key: Key('item-${i.code}'),
               minTileHeight: 64,
               title: Text(i.name, style: const TextStyle(fontSize: 20)),
-              trailing: Text(rupees(i.rate)),
               onTap: () => Navigator.pop(context, i),
             ),
         ],
@@ -69,7 +73,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       if (existing.isNotEmpty) {
         existing.first.qty++;
       } else {
-        _lines.add(OrderLine(item));
+        _lines.add(OrderLine(item, rate: 0)); // the rep types the price
       }
     });
   }
@@ -124,7 +128,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ),
               const SizedBox(height: 16),
               for (final l in _lines)
-                _LineTile(
+                OrderLineTile(
                   line: l,
                   onChanged: () => setState(() {}),
                   onRemove: () => setState(() => _lines.remove(l)),
@@ -172,75 +176,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _LineTile extends StatelessWidget {
-  const _LineTile({
-    required this.line,
-    required this.onChanged,
-    required this.onRemove,
-  });
-  final OrderLine line;
-  final VoidCallback onChanged;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    line.item.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text('${rupees(line.rate)}  =  ${rupees(line.amount)}'),
-                ],
-              ),
-            ),
-            IconButton.filledTonal(
-              key: Key('minus-${line.item.code}'),
-              iconSize: 28,
-              icon: const Icon(Icons.remove),
-              onPressed: () {
-                if (line.qty > 1) {
-                  line.qty--;
-                  onChanged();
-                } else {
-                  onRemove();
-                }
-              },
-            ),
-            SizedBox(
-              width: 52,
-              child: Text(
-                '${line.qty}',
-                key: Key('qty-${line.item.code}'),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-            ),
-            IconButton.filled(
-              key: Key('plus-${line.item.code}'),
-              iconSize: 28,
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                line.qty++;
-                onChanged();
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

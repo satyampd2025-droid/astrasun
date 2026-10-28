@@ -42,10 +42,7 @@ class TestOrderStages(MillFixture):
 		frappe.set_user(self.dispatcher)
 		invoicing.dispatch(task["name"])
 		seen = self.seen_by_rep(order["name"])
-		self.assertEqual((seen["stage"], seen["tone"]), ("On the way", "go"))
-
-		frappe.set_user(self.driver)
-		delivery.deliver(task["name"], "Ramesh Sharma")
+		self.assertEqual(seen["stage"], "Delivered, payment pending")  # the truck leaving is the delivery
 		self.assertEqual(self.seen_by_rep(order["name"])["stage"], "Delivered, payment pending")
 
 		frappe.set_user(self.driver)
@@ -105,7 +102,9 @@ class TestOrderStages(MillFixture):
 		)
 		invoicing.dispatch(task["name"])
 
+		# The truck leaving is the delivery: nothing waits on the driver any more
 		frappe.set_user(self.driver)
+		self.assertEqual([t for t in delivery.my_deliveries() if t["name"] == task["name"]], [])
 		self.assertEqual(
-			[t["stage"] for t in delivery.my_deliveries() if t["name"] == task["name"]], ["On the way"]
+			frappe.db.get_value("Delivery Note", task["name"], "astrasun_loading_status"), "Delivered"
 		)

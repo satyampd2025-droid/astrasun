@@ -38,6 +38,17 @@ void main() {
     await tester.pumpAndSettle();
     // The driver comes with the vehicle
     expect(find.text('Driver Ramesh Driver'), findsOneWidget);
+    // The warehouse picks the batch; nothing is chosen for them
+    await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('batch-missing-SAL-ORD-0000')), findsOneWidget);
+    for (final item in ['ATTA-50KG', 'ATTA-10KG']) {
+      await tester.tap(find.byKey(Key('batch-SAL-ORD-0000-$item')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('PK-DEMO-2026-00001').last);
+      await tester.pumpAndSettle();
+    }
+    expect(find.byKey(const Key('batch-missing-SAL-ORD-0000')), findsNothing);
     await tester.tap(find.byKey(const Key('loaded-SAL-ORD-0000')));
     await tester.pumpAndSettle();
     expect(find.textContaining('MP09AB1234'), findsWidgets);
@@ -59,20 +70,19 @@ void main() {
 
     await tester.tap(find.byKey(const Key('change-SAL-ORD-0000')));
     await tester.pumpAndSettle();
-    // More than the order asks for is refused
-    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '99');
+    // Items can be added or taken off, not only bags changed
+    await tester.tap(find.byKey(const Key('plus-ATTA-10KG')));
+    await tester.tap(find.byKey(const Key('minus-ATTA-50KG')));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.descendant(
-        of: find.byKey(const Key('change-reason')),
+        of: find.byKey(const Key('edit-reason')),
         matching: find.byType(TextField),
       ),
-      'Shop wants fewer',
+      'Shop wants a different mix',
     );
-    await tester.tap(find.byKey(const Key('change-send')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('change-send')), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('change-qty-ATTA-50KG')), '30');
-    await tester.tap(find.byKey(const Key('change-send')));
+    await tester.tap(find.byKey(const Key('send-edit')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('change-waiting-SAL-ORD-0000')),

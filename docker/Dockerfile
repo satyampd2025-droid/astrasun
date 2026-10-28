@@ -4,6 +4,13 @@ ARG ERPNEXT_VERSION=v15.121.6
 FROM frappe/erpnext:${ERPNEXT_VERSION}
 
 ARG INDIA_COMPLIANCE_BRANCH=version-15
+# The PDF tool draws only with fonts installed in the image; without a Hindi font every Devanagari letter
+# on the bill (customer or item names) comes out as dots.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-core fontconfig \
+    && fc-cache -f \
+    && rm -rf /var/lib/apt/lists/*
 USER frappe
 WORKDIR /home/frappe/frappe-bench
 

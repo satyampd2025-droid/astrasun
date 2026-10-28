@@ -30,7 +30,7 @@ class TestInvoicing(MillFixture):
 		frappe.set_user(self.dispatcher)
 		self.assertIn(dn, [t["name"] for t in invoicing.to_dispatch()])
 		out = invoicing.dispatch(dn)
-		self.assertEqual(out["status"], "Dispatched")
+		self.assertEqual(out["status"], "Delivered")
 		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Sales Invoice", view["invoice"], "docstatus"), 1)
 
@@ -52,7 +52,7 @@ class TestInvoicing(MillFixture):
 		view = invoicing.invoice(dn)
 		self.assertTrue(view["invoice"])
 		self.assertNotIn("eway_bill_needed", view)
-		self.assertEqual(invoicing.dispatch(dn)["status"], "Dispatched")  # the warehouse sends it too
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")  # the warehouse sends it too
 
 	def test_cannot_invoice_twice_and_roles_enforced(self):
 		_, dn = self._loaded()
@@ -66,3 +66,132 @@ class TestInvoicing(MillFixture):
 		frappe.set_user(self.accounts)
 		with self.assertRaises(frappe.PermissionError):
 			invoicing.dispatch(dn)  # accounts bill, they do not send trucks
+
+	def _item_flags(self, flags):
+		frappe.db.set_value("Item", ITEM, flags)
+		frappe.clear_document_cache("Item", ITEM)  # ERPNext reads the item through its cache
+
+	def _track_batches(self):
+		"""Finished bags are not tracked by batch by default; switch it on for the batch tests."""
+		old = frappe.db.get_value("Item", ITEM, ["has_batch_no", "create_new_batch"], as_dict=True)
+		self.addCleanup(self._item_flags, dict(old))
+		self._item_flags(
+			{"has_batch_no": 1, "create_new_batch": 1, "batch_number_series": "PK-TEST-.YYYY.-.#####"}
+		)
+
+	def _real_server(self):
+		"""ERPNext skips its batch check while testing; switch test mode off to see a real server."""
+		self.addCleanup(setattr, frappe.flags, "in_test", frappe.flags.in_test)
+		frappe.flags.in_test = False
+
+	def test_the_warehouse_chooses_the_batch_and_the_truck_leaves(self):
+		self._track_batches()
+		self._stock(20)
+		order = self._order(self._customer(limit=10000000), qty=4)
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(self.loader)
+		task = loading.start(order["name"])
+		listed = loading.batches(ITEM)
+		self.assertTrue(listed["tracked"])
+		batch = max(listed["batches"], key=lambda b: b["qty"])  # earlier runs may leave small batches behind
+		self.assertGreaterEqual(batch["qty"], 20)
+		dn = loading.mark_loaded(
+			task["name"], "MP09AB1234", [{"item_code": ITEM, "qty": 4, "batch_no": batch["batch_no"]}]
+		)["name"]
+		self.assertEqual(
+			loading._task(frappe.get_doc("Delivery Note", dn))["items"][0]["batch_no"], batch["batch_no"]
+		)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		self._real_server()
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")
+		rows = frappe.get_all(
+			"Delivery Note Item", filters={"parent": dn}, fields=["qty", "serial_and_batch_bundle"]
+		)
+		self.assertEqual(sum(r.qty for r in rows), 4)
+		self.assertTrue(all(r.serial_and_batch_bundle for r in rows))
+
+	def test_a_load_can_take_bags_from_two_batches_and_is_billed_whole(self):
+		self._track_batches()
+		self._stock(3)
+		self._stock(5)
+		order = self._order(self._customer(limit=10000000), qty=6)
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(self.loader)
+		task = loading.start(order["name"])
+		stock = sorted(loading.batches(ITEM)["batches"], key=lambda x: -x["qty"])
+		self.assertGreaterEqual(len(stock), 2)
+		b, a = stock[0], stock[1]  # four bags from the big batch, two from another
+		dn = loading.mark_loaded(
+			task["name"],
+			"MP09AB1234",
+			[
+				{"item_code": ITEM, "qty": 2, "batch_no": a["batch_no"]},
+				{"item_code": ITEM, "qty": 4, "batch_no": b["batch_no"]},
+			],
+		)["name"]
+		self.assertEqual(len(frappe.get_doc("Delivery Note", dn).items), 2)
+		view = invoicing.invoice(dn)
+		self.assertEqual(sum(r.qty for r in frappe.get_doc("Sales Invoice", view["invoice"]).items), 6)
+
+	def test_a_batch_without_enough_bags_is_refused(self):
+		self._track_batches()
+		self._stock(3)
+		order = self._order(self._customer(limit=10000000), qty=4)
+		frappe.set_user(self.manager)
+		orders.approve(order["name"])
+		frappe.set_user(self.loader)
+		task = loading.start(order["name"])
+		stock = loading.batches(ITEM)["batches"]
+		small = min(stock, key=lambda b: b["qty"])
+		with self.assertRaises(loading.LoadingError):
+			loading.mark_loaded(
+				task["name"],
+				"MP09AB1234",
+				[
+					{
+						"item_code": ITEM,
+						"qty": 4,
+						"batch_no": small["batch_no"] if small["qty"] < 4 else "NOPE",
+					}
+				],
+			)
+
+	def test_the_truck_cannot_leave_with_no_batch_chosen(self):
+		self._track_batches()
+		so, dn = self._loaded(qty=4)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		self._real_server()
+		with self.assertRaises(invoicing.InvoicingError):
+			invoicing.dispatch(dn)
+
+	def test_a_truck_loaded_without_a_batch_leaves_once_the_batch_is_chosen(self):
+		self._track_batches()
+		self._stock(20)
+		so, dn = self._loaded(qty=4)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		self._real_server()
+		batch = max(loading.batches(ITEM)["batches"], key=lambda b: b["qty"])["batch_no"]
+		with self.assertRaises(invoicing.InvoicingError):
+			invoicing.dispatch(dn, {ITEM: "NOPE"})
+		self.assertEqual(invoicing.dispatch(dn, {ITEM: batch})["status"], "Delivered")
+		rows = frappe.get_all("Delivery Note Item", filters={"parent": dn}, fields=["batch_no"])
+		self.assertEqual([r.batch_no for r in rows], [batch])
+
+	def test_the_truck_leaves_with_no_stock_and_no_batch(self):
+		# The mill tracks orders, not stock, for now: nothing is in the warehouse and no batch is asked for
+		self.assertFalse(frappe.db.get_value("Item", ITEM, "has_batch_no"))
+		so, dn = self._loaded(qty=4000)
+		frappe.set_user(self.accounts)
+		invoicing.invoice(dn)
+		frappe.set_user(self.dispatcher)
+		self._real_server()
+		self.assertEqual(invoicing.dispatch(dn)["status"], "Delivered")
+		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "docstatus"), 1)

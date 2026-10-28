@@ -87,11 +87,49 @@ class TestOrders(MillFixture):
 		self.assertIn(customer, [c["name"] for c in data["customers"]])
 		self.assertIn(ITEM, [i["item_code"] for i in data["items"]])
 
+	def test_catalog_shows_any_item_marked_allow_sales_but_not_wheat_or_bags(self):
+		frappe.set_user("Administrator")
+		code = "TEST-OWN-FLOUR"
+		if not frappe.db.exists("Item", code):
+			frappe.get_doc(
+				{
+					"doctype": "Item",
+					"item_code": code,
+					"item_name": "Own flour",
+					"item_group": "Bulk Flour",
+					"gst_hsn_code": "11010000",
+					"stock_uom": "Nos",
+					"is_sales_item": 1,
+				}
+			).insert()
+		frappe.set_user(self.rep)
+		codes = [i["item_code"] for i in orders.catalog()["items"]]
+		self.assertIn(code, codes)
+		self.assertNotIn("WHEAT", codes)
+		self.assertFalse([c for c in codes if c.startswith("BAG-")])
+		# An item with no defaults still gets the Finished Goods warehouse of the company
+		self.assertTrue(orders._warehouse(code, self.company))
+
+	def test_an_order_needs_a_price_on_every_line(self):
+		frappe.set_user(self.rep)
+		for rate in (None, 0):
+			row = (
+				{"item_code": ITEM, "qty": 5} if rate is None else {"item_code": ITEM, "qty": 5, "rate": rate}
+			)
+			with self.assertRaises(frappe.ValidationError):
+				orders.create_order(self._customer(), [row])
+
 	def test_below_list_price_needs_the_owner(self):
 		frappe.set_user("Administrator")
 		if not frappe.db.exists("Item Price", {"item_code": ITEM, "selling": 1}):
 			frappe.get_doc(
-				{"doctype": "Item Price", "item_code": ITEM, "price_list": "Standard Selling", "selling": 1, "price_list_rate": 1500}
+				{
+					"doctype": "Item Price",
+					"item_code": ITEM,
+					"price_list": "Standard Selling",
+					"selling": 1,
+					"price_list_rate": 1500,
+				}
 			).insert()
 		order = self._order(self._customer(limit=1000000), rate=1000)
 		self.assertTrue(order["below_min_price"])

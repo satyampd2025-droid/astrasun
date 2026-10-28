@@ -60,6 +60,8 @@ const Map<String, Map<String, String>> _strings = {
     'Reject': 'मना करें',
     'Send back': 'वापस भेजें',
     'Reason': 'कारण',
+    'Write a reason first': 'पहले कारण लिखें',
+    'Enter the price for every item': 'हर माल का भाव लिखें',
     'Done': 'ठीक है',
     'No orders waiting for you': 'आपके लिए कोई ऑर्डर बाकी नहीं',
     'No orders yet': 'अभी कोई ऑर्डर नहीं',
@@ -115,6 +117,11 @@ const Map<String, Map<String, String>> _strings = {
     'The order goes back to the owner for approval. A printed bill is cancelled and you print a new one.':
         'ऑर्डर फिर से मालिक की मंज़ूरी के लिए जाएगा। छपा बिल रद्द होगा और आप नया बिल छापेंगे।',
     'Send to the owner': 'मालिक को भेजें',
+    'Edit order': 'ऑर्डर बदलें',
+    'Change asked': 'बदलाव माँगा गया',
+    'The order goes to the owner for approval. A printed bill is cancelled and loading starts again.':
+        'ऑर्डर मालिक की मंज़ूरी के लिए जाएगा। छपा बिल रद्द होगा और लोडिंग फिर से शुरू होगी।',
+    'Change sent to the owner': 'बदलाव मालिक को भेजा गया',
     'Change waiting for the owner': 'मालिक की मंज़ूरी का इंतज़ार है',
     'The owner has to approve. The printed bill is cancelled and you print a new one.':
         'मालिक को मंज़ूर करना होगा। छपा बिल रद्द होगा और आप नया बिल छापेंगे।',
@@ -132,6 +139,11 @@ const Map<String, Map<String, String>> _strings = {
     'Available for loading': 'लोडिंग के लिए उपलब्ध',
     'Not available': 'उपलब्ध नहीं',
     'Pick the vehicle': 'गाड़ी चुनें',
+    'Pick the batch': 'बैच चुनें',
+    'Notifications': 'सूचनाएँ',
+    'Order changed': 'ऑर्डर बदल दिया गया',
+    'No alerts yet': 'अभी कोई सूचना नहीं',
+    'Batch': 'बैच',
     'Driver {0}': 'ड्राइवर {0}',
     'No vehicles yet. Ask the owner to add them.':
         'अभी कोई गाड़ी नहीं है। मालिक से जुड़वाएं।',

@@ -7,7 +7,6 @@ import frappe
 
 from astrasun import (
 	dashboard,
-	delivery,
 	invoicing,
 	loading,
 	milling,
@@ -18,7 +17,7 @@ from astrasun import (
 	wheat,
 )
 from astrasun.setup.masters import bag_code
-from astrasun.tests.helpers import ITEM, MillFixture, _user
+from astrasun.tests.helpers import MillFixture, _user
 
 
 class TestMVPAcceptance(MillFixture):
@@ -29,14 +28,19 @@ class TestMVPAcceptance(MillFixture):
 		loader = _user("loader@example.com", "Mill Warehouse")
 		accounts = _user("accounts@example.com", "Mill Accounts")
 		dispatcher = _user("dispatch@example.com", "Mill Dispatch")
-		driver = _user("driver@example.com", "Mill Driver")
 		if not frappe.db.exists("Supplier", "Test Mandi Trader"):
 			frappe.get_doc(
-				{"doctype": "Supplier", "supplier_name": "Test Mandi Trader", "supplier_group": "All Supplier Groups"}
+				{
+					"doctype": "Supplier",
+					"supplier_name": "Test Mandi Trader",
+					"supplier_group": "All Supplier Groups",
+				}
 			).insert()
 
 		def stock(code):
-			wh = frappe.db.get_value("Item Default", {"parent": code, "company": self.company}, "default_warehouse")
+			wh = frappe.db.get_value(
+				"Item Default", {"parent": code, "company": self.company}, "default_warehouse"
+			)
 			return flt_(frappe.db.get_value("Bin", {"item_code": code, "warehouse": wh}, "actual_qty"))
 
 		wheat0, atta0, fg0 = stock("WHEAT"), stock("ATTA-BULK"), stock("ATTA-10KG")
@@ -113,7 +117,8 @@ class TestMVPAcceptance(MillFixture):
 		orders.approve(order["name"], "OK for this dealer")
 		self.assertTrue(
 			frappe.db.exists(
-				"Critical Change Log", {"reference_name": order["name"], "action": "Approval", "user": self.owner}
+				"Critical Change Log",
+				{"reference_name": order["name"], "action": "Approval", "user": self.owner},
 			)
 		)
 		# 8. Warehouse gets the loading task and confirms what was actually loaded
@@ -129,13 +134,15 @@ class TestMVPAcceptance(MillFixture):
 		frappe.set_user(dispatcher)
 		out = invoicing.dispatch(task["name"])
 		self.assertEqual(out["vehicle_no"], "MP09AB1234")
-		frappe.set_user(driver)
-		delivery.deliver(task["name"], "Ramesh Sharma")
+		self.assertEqual(out["status"], "Delivered")  # the truck leaving is the delivery
 
 		# 11. Finished stock and customer receivable update correctly
 		self.assertEqual(stock("ATTA-10KG"), fg0 + 200)
 		invoice_total = frappe.db.get_value("Sales Invoice", view["invoice"], "grand_total")
-		self.assertEqual(frappe.db.get_value("Sales Invoice", view["invoice"], "outstanding_amount"), invoice_total)
+		self.assertEqual(
+			frappe.db.get_value("Sales Invoice", view["invoice"], "outstanding_amount"), invoice_total
+		)
+		frappe.set_user(accounts)
 		owed = {d["customer"]: d["due"] for d in payments.dues()}
 		self.assertEqual(owed[customer], invoice_total)
 		payments.collect(customer, 10000, "Cash")

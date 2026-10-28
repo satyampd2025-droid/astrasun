@@ -44,13 +44,17 @@ class Me {
 
 /// Talks to ERPNext over its REST API with a session cookie.
 class ErpNextClient {
-  ErpNextClient(String baseUrl, {http.Client? httpClient})
-    : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
+  ErpNextClient(String baseUrl, {http.Client? httpClient, String? sid})
+    : _sid = sid,
+      baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), ''),
       _http = httpClient ?? http.Client();
 
   final String baseUrl;
   final http.Client _http;
   String? _sid;
+
+  /// The server's session, kept on the phone so closing the app does not log out.
+  String? get sid => _sid;
 
   Map<String, String> get _headers => {
     'Accept': 'application/json',
@@ -165,6 +169,31 @@ class ErpNextClient {
     return Order.fromJson(_message(res) as Map<String, dynamic>);
   }
 
+  /// One order in full, for the screen that edits it.
+  Future<Order> order(String name) async => Order.fromJson(
+    _message(await _post('astrasun.orders.get_order', {'name': name}))
+        as Map<String, dynamic>,
+  );
+
+  /// The rep or the warehouse changes an order; the owner has to approve it.
+  Future<Order> editOrder(
+    Order order,
+    List<OrderLine> lines,
+    String reason,
+  ) async => Order.fromJson(
+    _message(
+          await _post('astrasun.orders.edit_order', {
+            'name': order.name,
+            'items': [
+              for (final l in lines)
+                {'item_code': l.item.code, 'qty': l.qty, 'rate': l.rate},
+            ],
+            'reason': reason,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
+
   Future<List<Order>> myOrders() async =>
       _orders(_message(await _post('astrasun.orders.my_orders', {})));
 
@@ -222,19 +251,38 @@ class ErpNextClient {
             as Map<String, dynamic>,
       );
 
-  /// [loaded] maps item code to the bags actually put on the truck.
+  /// The batches of a bag item that have bags in stock, oldest first (empty when the item has none).
+  Future<List<BatchStock>> batchesInStock(String itemCode) async => [
+    for (final b
+        in (_message(
+                  await _post('astrasun.loading.batches', {
+                    'item_code': itemCode,
+                  }),
+                )
+                as Map<String, dynamic>)['batches']
+            as List)
+      BatchStock.fromJson(b as Map<String, dynamic>),
+  ];
+
+  /// [loaded] maps item code to the bags actually put on the truck; [batches] maps item code to the
+  /// batch the warehouse chose for it.
   Future<LoadingTask> markLoaded(
     LoadingTask task,
     String vehicleNo,
-    Map<String, int> loaded,
-  ) async => LoadingTask.fromJson(
+    Map<String, int> loaded, {
+    Map<String, String> batches = const {},
+  }) async => LoadingTask.fromJson(
     _message(
           await _post('astrasun.loading.mark_loaded', {
             'name': task.id,
             'vehicle_no': vehicleNo,
             'items': [
               for (final e in loaded.entries)
-                {'item_code': e.key, 'qty': e.value},
+                {
+                  'item_code': e.key,
+                  'qty': e.value,
+                  if (batches[e.key] != null) 'batch_no': batches[e.key],
+                },
             ],
           }),
         )
@@ -343,11 +391,19 @@ class ErpNextClient {
         as Map<String, dynamic>,
   );
 
-  Future<LoadingTask> dispatchTruck(LoadingTask task) async =>
-      LoadingTask.fromJson(
-        _message(await _post('astrasun.invoicing.dispatch', {'name': task.id}))
-            as Map<String, dynamic>,
-      );
+  /// `batches` fills in the batch of bag items that were loaded without one.
+  Future<LoadingTask> dispatchTruck(
+    LoadingTask task, {
+    Map<String, String> batches = const {},
+  }) async => LoadingTask.fromJson(
+    _message(
+          await _post('astrasun.invoicing.dispatch', {
+            'name': task.id,
+            if (batches.isNotEmpty) 'batches': batches,
+          }),
+        )
+        as Map<String, dynamic>,
+  );
 
   Future<List<LoadingTask>> myDeliveries() async =>
       _trucks(_message(await _post('astrasun.delivery.my_deliveries', {})));
@@ -384,6 +440,21 @@ class ErpNextClient {
         )
         as Map<String, dynamic>,
   );
+
+  /// The bell: newest first.
+  Future<List<AppAlert>> alerts() async => [
+    for (final a
+        in _message(await _post('astrasun.alerts.my_alerts', {})) as List)
+      AppAlert.fromJson(a as Map<String, dynamic>),
+  ];
+
+  Future<int> unreadAlerts() async =>
+      (_message(await _post('astrasun.alerts.unread_count', {})) as num)
+          .toInt();
+
+  Future<void> markAlertsRead() async {
+    _message(await _post('astrasun.alerts.mark_read', {}));
+  }
 
   Future<MyCollections> myCollections() async => MyCollections.fromJson(
     _message(await _post('astrasun.receipts.my_collections', {}))

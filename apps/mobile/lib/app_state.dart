@@ -17,9 +17,10 @@ class AppState extends ChangeNotifier {
     this.developerBuild = kDebugMode,
   }) : fixedServer = fixedServer ?? _fixedServer();
 
-  static ErpNextClient _defaultClient(String url) => ErpNextClient(url);
+  static ErpNextClient _defaultClient(String url, {String? sid}) =>
+      ErpNextClient(url, sid: sid);
 
-  final ErpNextClient Function(String url) clientFactory;
+  final ErpNextClient Function(String url, {String? sid}) clientFactory;
 
   /// Server address staff never have to type. Empty until the mill server exists.
   final String fixedServer;
@@ -43,7 +44,24 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     locale = Locale(prefs.getString('language') ?? 'hi');
     serverUrl = askForServer ? (prefs.getString('server') ?? '') : fixedServer;
+    await _resume(prefs);
     notifyListeners();
+  }
+
+  /// Back into the app with the session saved at the last login.
+  Future<void> _resume(SharedPreferences prefs) async {
+    final sid = prefs.getString('sid');
+    if (sid == null || serverUrl.isEmpty) return;
+    final c = clientFactory(serverUrl, sid: sid);
+    try {
+      me = await c.me();
+      client = c;
+      await c.setLanguage(locale.languageCode);
+    } on LoginFailed {
+      await prefs.remove('sid'); // the server ended the session
+    } on Exception {
+      // No signal right now: the login screen shows and the saved session stays.
+    }
   }
 
   static String _fixedServer() {
@@ -70,6 +88,8 @@ class AppState extends ChangeNotifier {
     serverUrl = server;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', server);
+    final sid = c.sid;
+    if (sid != null) await prefs.setString('sid', sid);
     await client!.setLanguage(locale.languageCode);
     notifyListeners();
   }
@@ -83,6 +103,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     await client?.logout();
+    (await SharedPreferences.getInstance()).remove('sid');
     client = null;
     me = null;
     notifyListeners();

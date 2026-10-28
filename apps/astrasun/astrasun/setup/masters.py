@@ -209,8 +209,6 @@ def setup_items(company, warehouses):
 				is_purchase_item=0,
 				weight_per_unit=kg,
 				weight_uom="Kg",
-				batch_number_series=f"PK-{sku_code(bulk_code, kg)}-.YYYY.-.#####",
-				**batch,
 			)
 			_ensure_item(
 				company,

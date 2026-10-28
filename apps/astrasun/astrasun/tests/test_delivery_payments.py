@@ -11,13 +11,9 @@ class TestDeliveryAndPayments(MillFixture):
 
 	def test_driver_records_delivery_proof(self):
 		_, dn, _inv = self.make_dispatched()
+		# The truck leaving already counted as the delivery, so there is nothing left for a driver to do
+		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "astrasun_loading_status"), "Delivered")
 		frappe.set_user(self.driver)
-		self.assertIn(dn, [t["name"] for t in delivery.my_deliveries()])
-		with self.assertRaises(frappe.ValidationError):
-			delivery.deliver(dn, " ")
-		done = delivery.deliver(dn, "Ramesh Sharma", "Delivered at shop")
-		self.assertEqual(done["status"], "Delivered")
-		self.assertEqual(frappe.db.get_value("Delivery Note", dn, "astrasun_received_by"), "Ramesh Sharma")
 		self.assertNotIn(dn, [t["name"] for t in delivery.my_deliveries()])
 		with self.assertRaises(frappe.ValidationError):
 			delivery.deliver(dn, "Someone else")
@@ -33,9 +29,13 @@ class TestDeliveryAndPayments(MillFixture):
 		result = payments.collect(customer, total1 + 1000, "Cash")
 		self.assertEqual([m["invoice"] for m in result["matched"]], [inv1, inv2])
 		self.assertEqual(frappe.db.get_value("Sales Invoice", inv1, "outstanding_amount"), 0)
-		self.assertEqual(frappe.db.get_value("Sales Invoice", inv2, "outstanding_amount"), 
-			frappe.db.get_value("Sales Invoice", inv2, "grand_total") - 1000)
-		self.assertEqual(result["still_due"], frappe.db.get_value("Sales Invoice", inv2, "outstanding_amount"))
+		self.assertEqual(
+			frappe.db.get_value("Sales Invoice", inv2, "outstanding_amount"),
+			frappe.db.get_value("Sales Invoice", inv2, "grand_total") - 1000,
+		)
+		self.assertEqual(
+			result["still_due"], frappe.db.get_value("Sales Invoice", inv2, "outstanding_amount")
+		)
 
 	def test_payment_rules(self):
 		customer, _dn, inv = self.make_dispatched()
