@@ -108,7 +108,14 @@ def _warehouse(item_code, company):
 	) or frappe.db.get_value("Warehouse", {"company": company, "warehouse_name": "Finished Goods"})
 
 
+def _prices_given(items):
+	"""The sales rep decides each dealer's price, so every line must carry one."""
+	if any(flt(row.get("rate")) <= 0 for row in items):
+		frappe.throw(_("Enter the price for every item"))
+
+
 def create_order_doc(customer, items, delivery_date=None, remarks=None):
+	_prices_given(items)
 	company = _company(items[0]["item_code"])
 	doc = frappe.get_doc(
 		{
@@ -381,6 +388,8 @@ def edit_order(name, items, reason, delivery_date=None):
 				if old
 				else frappe.db.get_value("Item Price", {"item_code": code, "selling": 1}, "price_list_rate")
 			)
+		if flt(rate) <= 0:
+			frappe.throw(_("Enter the price for every item"), EditError)
 		qty += wanted[code]["qty"] if code in wanted else 0
 		wanted[code] = {"item_code": code, "qty": qty, "rate": flt(rate)}
 	if not wanted:
