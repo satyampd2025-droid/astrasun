@@ -30,6 +30,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Future<void> _send() async {
     final s = S.of(context);
+    if (_lines.any((l) => l.rate <= 0)) {
+      setState(() => _error = s.t('Enter the price for every item'));
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -58,7 +62,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               key: Key('item-${i.code}'),
               minTileHeight: 64,
               title: Text(i.name, style: const TextStyle(fontSize: 20)),
-              trailing: Text(rupees(i.rate)),
               onTap: () => Navigator.pop(context, i),
             ),
         ],
@@ -70,7 +73,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       if (existing.isNotEmpty) {
         existing.first.qty++;
       } else {
-        _lines.add(OrderLine(item));
+        _lines.add(OrderLine(item, rate: 0)); // the rep types the price
       }
     });
   }

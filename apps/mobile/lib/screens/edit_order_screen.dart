@@ -60,7 +60,6 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
               key: Key('item-${i.code}'),
               minTileHeight: 64,
               title: Text(i.name, style: const TextStyle(fontSize: 20)),
-              trailing: Text(rupees(i.rate)),
               onTap: () => Navigator.pop(context, i),
             ),
         ],
@@ -72,7 +71,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       if (existing.isNotEmpty) {
         existing.first.qty++;
       } else {
-        _lines.add(OrderLine(item));
+        _lines.add(OrderLine(item, rate: 0)); // the rep types the price
       }
     });
   }
@@ -81,6 +80,10 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     final s = S.of(context);
     if (_reason.text.trim().isEmpty) {
       setState(() => _error = s.t('Write a reason first'));
+      return;
+    }
+    if (_lines.any((l) => l.rate <= 0)) {
+      setState(() => _error = s.t('Enter the price for every item'));
       return;
     }
     setState(() {

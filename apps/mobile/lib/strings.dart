@@ -61,6 +61,7 @@ const Map<String, Map<String, String>> _strings = {
     'Send back': 'वापस भेजें',
     'Reason': 'कारण',
     'Write a reason first': 'पहले कारण लिखें',
+    'Enter the price for every item': 'हर माल का भाव लिखें',
     'Done': 'ठीक है',
     'No orders waiting for you': 'आपके लिए कोई ऑर्डर बाकी नहीं',
     'No orders yet': 'अभी कोई ऑर्डर नहीं',

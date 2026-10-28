@@ -110,6 +110,15 @@ class TestOrders(MillFixture):
 		# An item with no defaults still gets the Finished Goods warehouse of the company
 		self.assertTrue(orders._warehouse(code, self.company))
 
+	def test_an_order_needs_a_price_on_every_line(self):
+		frappe.set_user(self.rep)
+		for rate in (None, 0):
+			row = (
+				{"item_code": ITEM, "qty": 5} if rate is None else {"item_code": ITEM, "qty": 5, "rate": rate}
+			)
+			with self.assertRaises(frappe.ValidationError):
+				orders.create_order(self._customer(), [row])
+
 	def test_below_list_price_needs_the_owner(self):
 		frappe.set_user("Administrator")
 		if not frappe.db.exists("Item Price", {"item_code": ITEM, "selling": 1}):

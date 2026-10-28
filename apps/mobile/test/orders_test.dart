@@ -42,6 +42,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('qty-ATTA-50KG')), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
+    // No price is listed: the rep types it, and cannot send without it
+    expect(find.text('Total: ₹0'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('send-order')));
+    await tester.tap(find.byKey(const Key('send-order')));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter the price for every item'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('rate-ATTA-50KG')), '2150');
+    await tester.pumpAndSettle();
     expect(find.text('Total: ₹4,300'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('send-order')));
@@ -59,6 +67,8 @@ void main() {
     await tester.tap(find.byKey(const Key('add-item')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('item-ATTA-5KG')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('rate-ATTA-5KG')), '230');
     await tester.pumpAndSettle();
     expect(find.text('Total: ₹230'), findsOneWidget);
     await tester.tap(find.byKey(const Key('minus-ATTA-5KG')));
@@ -146,6 +156,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('item-ATTA-26KG')));
     await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('rate-ATTA-26KG')), '1100');
     await tester.tap(find.byKey(const Key('minus-ATTA-50KG')));
     await tester.pumpAndSettle();
     await tester.enterText(
